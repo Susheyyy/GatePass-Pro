@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config({ override: true });
 const connectDB = require('./config/db');
 const residentRoutes = require('./routes/residentRoutes');
+const visitorRoutes = require('./routes/visitorRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -14,6 +15,7 @@ app.use(express.json());
 
 
 app.use('/api/residents', residentRoutes);
+app.use('/api/visitors', visitorRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: "GatePass Pro Backend API Online" });

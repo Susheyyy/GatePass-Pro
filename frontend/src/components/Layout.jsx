@@ -23,7 +23,7 @@ export default function Layout({ children }) {
         { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> },
       ]
     : [
-        { path: '/resident-dashboard', label: 'Profile Request', icon: <ShieldAlert size={18} /> },
+        { path: '/resident-dashboard', label: 'Resident Dashboard', icon: <LayoutDashboard size={18} /> },
       ];
 
   return (

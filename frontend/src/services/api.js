@@ -143,3 +143,78 @@ export const residentApi = {
     }
   }
 };
+
+const VISITOR_API_BASE_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/residents', '/visitors') : 'http://localhost:5000/api/visitors';
+
+const getLocalVisitors = () => {
+  const local = localStorage.getItem('gatepass_visitors');
+  if (!local) return [];
+  return JSON.parse(local);
+};
+
+const saveLocalVisitors = (visitors) => {
+  localStorage.setItem('gatepass_visitors', JSON.stringify(visitors));
+};
+
+export const visitorApi = {
+  getAll: async (params = {}) => {
+    try {
+      const response = await axios.get(VISITOR_API_BASE_URL, { params });
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, using LocalStorage fallback for visitors:', error.message);
+      let list = getLocalVisitors();
+      if (params.flatNo) {
+        list = list.filter(v => v.flatNo === params.flatNo);
+      }
+      return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+  },
+  create: async (visitorData) => {
+    try {
+      const response = await axios.post(VISITOR_API_BASE_URL, visitorData);
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, saving visitor to LocalStorage:', error.message);
+      const list = getLocalVisitors();
+      const newVisitor = {
+        ...visitorData,
+        passcode: Math.floor(100000 + Math.random() * 900000).toString(),
+        status: visitorData.status || 'Approved',
+        _id: 'mock-visitor-' + Math.random().toString(36).substr(2, 9),
+        createdAt: new Date().toISOString()
+      };
+      list.push(newVisitor);
+      saveLocalVisitors(list);
+      return newVisitor;
+    }
+  },
+  update: async (id, visitorData) => {
+    try {
+      const response = await axios.put(`${VISITOR_API_BASE_URL}/${id}`, visitorData);
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, updating visitor in LocalStorage:', error.message);
+      const list = getLocalVisitors();
+      const index = list.findIndex(v => v._id === id);
+      if (index !== -1) {
+        list[index] = { ...list[index], ...visitorData };
+        saveLocalVisitors(list);
+        return list[index];
+      }
+      throw new Error('Visitor not found in local storage');
+    }
+  },
+  delete: async (id) => {
+    try {
+      const response = await axios.delete(`${VISITOR_API_BASE_URL}/${id}`);
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, deleting visitor from LocalStorage:', error.message);
+      const list = getLocalVisitors();
+      const filtered = list.filter(v => v._id !== id);
+      saveLocalVisitors(filtered);
+      return { message: 'Visitor removed successfully' };
+    }
+  }
+};
