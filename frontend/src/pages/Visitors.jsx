@@ -33,6 +33,7 @@ export default function Visitors() {
     status: 'Approved'
   });
   const [selectedVisitor, setSelectedVisitor] = useState(null);
+  const userRole = localStorage.getItem('gatepass_role') || 'admin';
 
   const fetchVisitors = async (query = '') => {
     setLoading(true);
@@ -112,10 +113,12 @@ export default function Visitors() {
             Manage current check-ins, approve visitor passcodes, and track society entry logs.
           </p>
         </div>
-        <FormButton onClick={() => setIsAddOpen(true)} variant="primary">
-          <Plus size={18} />
-          <span>New Entry Pass</span>
-        </FormButton>
+        {userRole !== 'security' && (
+          <FormButton onClick={() => setIsAddOpen(true)} variant="primary">
+            <Plus size={18} />
+            <span>New Entry Pass</span>
+          </FormButton>
+        )}
       </div>
 
       <div className="content-card">
@@ -220,13 +223,15 @@ export default function Visitors() {
                             <LogOut size={16} />
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDelete(visitor._id)}
-                          title="Delete Record"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {userRole !== 'security' && (
+                          <button
+                            onClick={() => handleDelete(visitor._id)}
+                            title="Delete Record"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

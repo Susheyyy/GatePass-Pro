@@ -56,6 +56,16 @@ export default function Login() {
         return;
       }
 
+      if (formattedEmail === 'security@gatepass.com' && password === 'security123') {
+        localStorage.setItem('gatepass_token', 'true');
+        localStorage.setItem('gatepass_role', 'security');
+        localStorage.removeItem('gatepass_resident_id');
+        localStorage.removeItem('gatepass_resident_email');
+        setIsLoading(false);
+        navigate('/visitors');
+        return;
+      }
+
       const residentsList = await residentApi.getAll();
       const matchedResident = residentsList.find(r => {
         const firstName = r.name.trim().split(' ')[0].toLowerCase();
@@ -505,6 +515,7 @@ export default function Login() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div><strong>Admin:</strong> admin@gatepass.com / <code style={{ color: 'var(--primary)', fontWeight: 'bold' }}>admin123</code></div>
+            <div><strong>Security:</strong> security@gatepass.com / <code style={{ color: 'var(--primary)', fontWeight: 'bold' }}>security123</code></div>
             <div><strong>Resident:</strong> firstname.flatnumber@gatepass.com / <code style={{ color: 'var(--primary)', fontWeight: 'bold' }}>resident123</code></div>
           </div>
         </div>

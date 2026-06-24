@@ -15,6 +15,9 @@ function HomeRedirect() {
   if (role === 'resident') {
     return <Navigate to="/resident-dashboard" replace />;
   }
+  if (role === 'security') {
+    return <Navigate to="/visitors" replace />;
+  }
   return <Dashboard />;
 }
 

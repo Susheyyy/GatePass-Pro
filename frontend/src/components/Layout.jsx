@@ -24,6 +24,10 @@ export default function Layout({ children }) {
         { path: '/community', label: 'Community', icon: <MessageSquare size={18} /> },
         { path: '/profile', label: 'My Profile', icon: <User size={18} /> }
       ]
+    : userRole === 'security'
+    ? [
+        { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> }
+      ]
     : [
         { path: '/resident-dashboard', label: 'Resident Dashboard', icon: <LayoutDashboard size={18} /> },
         { path: '/community', label: 'Community', icon: <MessageSquare size={18} /> },
@@ -69,7 +73,7 @@ export default function Layout({ children }) {
               width: '36px', 
               height: '36px', 
               borderRadius: '50%', 
-              background: userRole === 'admin' ? 'linear-gradient(135deg, #a855f7, #6366f1)' : 'linear-gradient(135deg, #10b981, #6366f1)', 
+              background: userRole === 'admin' ? 'linear-gradient(135deg, #a855f7, #6366f1)' : userRole === 'security' ? 'linear-gradient(135deg, #f43f5e, #e11d48)' : 'linear-gradient(135deg, #10b981, #6366f1)', 
               color: 'white', 
               display: 'flex', 
               alignItems: 'center', 
@@ -77,14 +81,14 @@ export default function Layout({ children }) {
               fontWeight: 'bold',
               fontSize: '0.85rem'
             }}>
-              {userRole === 'admin' ? 'AD' : 'RS'}
+              {userRole === 'admin' ? 'AD' : userRole === 'security' ? 'SE' : 'RS'}
             </div>
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-main)', lineHeight: 1.2 }}>
-                {userRole === 'admin' ? 'Admin Portal' : 'Resident Portal'}
+                {userRole === 'admin' ? 'Admin Portal' : userRole === 'security' ? 'Security Portal' : 'Resident Portal'}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {userRole === 'admin' ? 'admin@gatepass.com' : residentEmail}
+                {userRole === 'admin' ? 'admin@gatepass.com' : userRole === 'security' ? 'security@gatepass.com' : residentEmail}
               </div>
             </div>
           </div>

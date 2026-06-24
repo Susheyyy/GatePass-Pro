@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { 
   Users, 
   UserPlus, 
@@ -21,6 +22,10 @@ import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
 export default function Residents() {
+  const userRole = localStorage.getItem('gatepass_role') || 'admin';
+  if (userRole === 'security') {
+    return <Navigate to="/visitors" replace />;
+  }
   const toast = useToast();
   const [residents, setResidents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
