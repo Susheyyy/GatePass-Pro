@@ -70,6 +70,9 @@ export const residentApi = {
       const created = response.data;
       return created;
     } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
       console.warn('Backend offline, saving to LocalStorage:', error.message);
       const list = getLocalResidents();
       const firstName = residentData.name.trim().split(' ')[0].toLowerCase();
@@ -99,6 +102,9 @@ export const residentApi = {
       const response = await axios.put(`${API_BASE_URL}/${id}`, residentData);
       return response.data;
     } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
       console.warn('Backend offline, updating in LocalStorage:', error.message);
       const list = getLocalResidents();
       const index = list.findIndex(r => r._id === id);
@@ -135,11 +141,35 @@ export const residentApi = {
       const response = await axios.delete(`${API_BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
       console.warn('Backend offline, deleting from LocalStorage:', error.message);
       const list = getLocalResidents();
       const filtered = list.filter(r => r._id !== id);
       saveLocalResidents(filtered);
       return { message: 'Resident removed successfully from local storage' };
+    }
+  },
+
+  resendOtp: async (id) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/${id}/resend-otp`);
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      console.warn('Backend offline, generating new OTP locally:', error.message);
+      const list = getLocalResidents();
+      const index = list.findIndex(r => r._id === id);
+      if (index !== -1) {
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        list[index].otp = generatedOtp;
+        saveLocalResidents(list);
+        return { message: 'New OTP sent successfully', otp: generatedOtp };
+      }
+      throw new Error('Resident not found in local storage');
     }
   }
 };

@@ -13,7 +13,8 @@ import {
   Check, 
   Info,
   Building,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { residentApi } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
@@ -137,6 +138,15 @@ export default function Residents() {
       fetchResidents(searchQuery);
     } catch (err) {
       setError('Could not delete resident. Please try again.');
+    }
+  };
+
+  const handleResendOtp = async (resident) => {
+    try {
+      await residentApi.resendOtp(resident._id);
+      showNotification(`New verification OTP sent to ${resident.name}'s Gmail address.`);
+    } catch (err) {
+      setError(err.message || 'Failed to resend OTP.');
     }
   };
 
@@ -376,6 +386,26 @@ export default function Residents() {
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        {resident.status !== 'Approved' && (
+                          <button 
+                            onClick={() => handleResendOtp(resident)}
+                            title="Resend OTP Email"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--text-muted)',
+                              padding: '6px',
+                              borderRadius: '6px',
+                              display: 'inline-flex',
+                              transition: 'var(--transition)'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--success)'; e.currentTarget.style.backgroundColor = 'var(--success-light)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <RefreshCw size={16} />
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleOpenEdit(resident)}
                           title="Edit Resident"

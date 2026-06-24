@@ -129,9 +129,42 @@ const deleteResident = async (req, res) => {
   }
 };
 
+const resendOtp = async (req, res) => {
+  try {
+    const resident = await Resident.findById(req.params.id);
+    if (!resident) {
+      return res.status(404).json({ message: 'Resident not found' });
+    }
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    resident.otp = generatedOtp;
+    await resident.save();
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const link = `${frontendUrl}/login?email=${resident.email}&otp=${generatedOtp}`;
+    
+    const mailOptions = {
+      from: process.env.SMTP_MAIL,
+      to: resident.gmail,
+      subject: 'GatePass Pro - New Verification OTP',
+      text: `Hello ${resident.name},\n\nYour new verification OTP has been generated.\n\nUsername: ${resident.email}\nDefault Password: resident123\nNew Verification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (mailError) {
+      console.error(mailError);
+    }
+
+    res.status(200).json({ message: 'New OTP sent successfully' });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getResidents,
   addResident,
   updateResident,
-  deleteResident
+  deleteResident,
+  resendOtp
 };

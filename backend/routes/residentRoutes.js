@@ -4,7 +4,8 @@ const {
   getResidents,
   addResident,
   updateResident,
-  deleteResident
+  deleteResident,
+  resendOtp
 } = require('../controllers/residentController');
 
 router.route('/')
@@ -14,5 +15,8 @@ router.route('/')
 router.route('/:id')
   .put(updateResident)
   .delete(deleteResident);
+
+router.route('/:id/resend-otp')
+  .post(resendOtp);
 
 module.exports = router;
