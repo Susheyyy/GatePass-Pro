@@ -8,8 +8,9 @@ const DEFAULT_RESIDENTS = [
     flatNo: 'A-101',
     name: 'Rajesh Kumar',
     mobile: '9876543210',
-    email: 'rajesh@gmail.com',
+    email: 'rajesh.a101@gatepass.com',
     members: 4,
+    status: 'Pending',
     createdAt: new Date().toISOString()
   },
   {
@@ -17,8 +18,9 @@ const DEFAULT_RESIDENTS = [
     flatNo: 'B-304',
     name: 'Priya Sharma',
     mobile: '9812345678',
-    email: 'priya.sharma@gmail.com',
+    email: 'priya.b304@gatepass.com',
     members: 3,
+    status: 'Approved',
     createdAt: new Date().toISOString()
   },
   {
@@ -26,8 +28,9 @@ const DEFAULT_RESIDENTS = [
     flatNo: 'C-502',
     name: 'Vikram Singh',
     mobile: '9988776655',
-    email: 'vikram.singh@gmail.com',
+    email: 'vikram.c502@gatepass.com',
     members: 5,
+    status: 'Rejected',
     createdAt: new Date().toISOString()
   }
 ];
@@ -46,7 +49,6 @@ const saveLocalResidents = (residents) => {
 };
 
 export const residentApi = {
-  // Get all residents, optionally filtered by search query
   getAll: async (searchQuery = '') => {
     try {
       const response = await axios.get(`${API_BASE_URL}`, {
@@ -60,21 +62,23 @@ export const residentApi = {
         const regex = new RegExp(searchQuery, 'i');
         list = list.filter(r => regex.test(r.name) || regex.test(r.flatNo));
       }
-      // Sort by newest first
       return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
   },
 
-  // Add a new resident
   create: async (residentData) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}`, residentData);
+      const response = await axios.post(`${API_BASE_URL}`, {
+        ...residentData,
+        status: 'Pending'
+      });
       return response.data;
     } catch (error) {
       console.warn('Backend offline, saving to LocalStorage:', error.message);
       const list = getLocalResidents();
       const newResident = {
         ...residentData,
+        status: 'Pending',
         _id: 'mock-' + Math.random().toString(36).substr(2, 9),
         createdAt: new Date().toISOString()
       };
@@ -84,7 +88,6 @@ export const residentApi = {
     }
   },
 
-  // Update an existing resident
   update: async (id, residentData) => {
     try {
       const response = await axios.put(`${API_BASE_URL}/${id}`, residentData);
@@ -102,7 +105,6 @@ export const residentApi = {
     }
   },
 
-  // Delete a resident
   delete: async (id) => {
     try {
       const response = await axios.delete(`${API_BASE_URL}/${id}`);

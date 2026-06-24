@@ -7,14 +7,24 @@ export default function Layout({ children }) {
 
   const handleLogout = () => {
     localStorage.removeItem('gatepass_token');
+    localStorage.removeItem('gatepass_role');
+    localStorage.removeItem('gatepass_resident_id');
+    localStorage.removeItem('gatepass_resident_email');
     navigate('/login');
   };
 
-  const navItems = [
-    { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-    { path: '/residents', label: 'Residents', icon: <Users size={18} /> },
-    { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> },
-  ];
+  const userRole = localStorage.getItem('gatepass_role') || 'admin';
+  const residentEmail = localStorage.getItem('gatepass_resident_email') || '';
+
+  const navItems = userRole === 'admin'
+    ? [
+        { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+        { path: '/residents', label: 'Residents', icon: <Users size={18} /> },
+        { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> },
+      ]
+    : [
+        { path: '/resident-dashboard', label: 'Profile Request', icon: <ShieldAlert size={18} /> },
+      ];
 
   return (
     <div className="layout-wrapper">
@@ -66,7 +76,7 @@ export default function Layout({ children }) {
               width: '36px', 
               height: '36px', 
               borderRadius: '50%', 
-              background: 'linear-gradient(135deg, #a855f7, #6366f1)', 
+              background: userRole === 'admin' ? 'linear-gradient(135deg, #a855f7, #6366f1)' : 'linear-gradient(135deg, #10b981, #6366f1)', 
               color: 'white', 
               display: 'flex', 
               alignItems: 'center', 
@@ -74,11 +84,15 @@ export default function Layout({ children }) {
               fontWeight: 'bold',
               fontSize: '0.85rem'
             }}>
-              AD
+              {userRole === 'admin' ? 'AD' : 'RS'}
             </div>
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-main)', lineHeight: 1.2 }}>Admin Portal</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>admin@gatepass.com</div>
+              <div style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-main)', lineHeight: 1.2 }}>
+                {userRole === 'admin' ? 'Admin Portal' : 'Resident Portal'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {userRole === 'admin' ? 'admin@gatepass.com' : residentEmail}
+              </div>
             </div>
           </div>
         </div>

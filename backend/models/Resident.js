@@ -26,6 +26,11 @@ const residentSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Number of members is required'],
     min: [1, 'Must have at least 1 member']
+  },
+  status: {
+    type: String,
+    enum: ['Pending', 'Approved', 'Rejected'],
+    default: 'Pending'
   }
 }, {
   timestamps: true

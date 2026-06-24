@@ -47,7 +47,7 @@ const addResident = async (req, res) => {
 // @route   PUT /api/residents/:id (update resident details)
 const updateResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, email, members } = req.body;
+    const { flatNo, name, mobile, email, members, status } = req.body;
     const resident = await Resident.findById(req.params.id);
     
     if (!resident) {
@@ -59,6 +59,7 @@ const updateResident = async (req, res) => {
     resident.mobile = mobile || resident.mobile;
     resident.email = email || resident.email;
     resident.members = members !== undefined ? members : resident.members;
+    resident.status = status || resident.status;
     
     const updatedResident = await resident.save();
     res.status(200).json(updatedResident);

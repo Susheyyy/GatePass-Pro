@@ -23,9 +23,8 @@ export default function Residents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Form states
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState('add'); // 'add' or 'edit'
+  const [formMode, setFormMode] = useState('add'); 
   const [selectedResidentId, setSelectedResidentId] = useState(null);
   
   const [formData, setFormData] = useState({
@@ -36,11 +35,9 @@ export default function Residents() {
     members: 1
   });
 
-  // Delete states
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState(null);
 
-  // Success Notification banner
   const [notification, setNotification] = useState('');
 
   const fetchResidents = async (query = '') => {
@@ -71,7 +68,6 @@ export default function Residents() {
     setTimeout(() => setNotification(''), 4000);
   };
 
-  // Open Form for Add
   const handleOpenAdd = () => {
     setFormData({
       flatNo: '',
@@ -84,7 +80,6 @@ export default function Residents() {
     setIsFormOpen(true);
   };
 
-  // Open Form for Edit
   const handleOpenEdit = (resident) => {
     setFormData({
       flatNo: resident.flatNo,
@@ -98,7 +93,6 @@ export default function Residents() {
     setIsFormOpen(true);
   };
 
-  // Handle Form Change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -107,7 +101,6 @@ export default function Residents() {
     }));
   };
 
-  // Submit Form
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -125,13 +118,11 @@ export default function Residents() {
     }
   };
 
-  // Trigger Delete Confirmation
   const triggerDelete = (resident) => {
     setResidentToDelete(resident);
     setIsDeleteOpen(true);
   };
 
-  // Confirm Delete
   const confirmDelete = async () => {
     if (!residentToDelete) return;
     try {
@@ -145,7 +136,6 @@ export default function Residents() {
     }
   };
 
-  // Stats calculators
   const totalResidents = residents.length;
   const totalMembers = residents.reduce((acc, curr) => acc + (parseInt(curr.members) || 0), 0);
   const occupiedUnits = new Set(residents.map(r => r.flatNo)).size;
@@ -153,7 +143,6 @@ export default function Residents() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
       
-      {/* Header Panel */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em' }}>
@@ -170,7 +159,6 @@ export default function Residents() {
         </FormButton>
       </div>
 
-      {/* Success Banner Alert */}
       {notification && (
         <div style={{
           backgroundColor: 'var(--success-light)',
@@ -190,7 +178,6 @@ export default function Residents() {
         </div>
       )}
 
-      {/* Stats Cards Row */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
@@ -242,10 +229,8 @@ export default function Residents() {
         </div>
       </div>
 
-      {/* Search and Table Content Card */}
       <div className="content-card">
-        
-        {/* Search Bar */}
+
         <div style={{ marginBottom: '24px', display: 'flex', gap: '15px', alignItems: 'center' }}>
           <div className="input-group" style={{ flex: 1 }}>
             <input
@@ -259,7 +244,6 @@ export default function Residents() {
           </div>
         </div>
 
-        {/* List Table */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
             <div style={{
@@ -312,6 +296,7 @@ export default function Residents() {
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mobile</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Members</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -340,6 +325,25 @@ export default function Residents() {
                     </td>
                     <td style={{ padding: '16px', textAlign: 'center', fontWeight: '700', color: 'var(--text-main)' }}>
                       {resident.members}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        backgroundColor: 
+                          resident.status === 'Approved' ? 'var(--success-light)' : 
+                          resident.status === 'Rejected' ? 'var(--accent-light)' : 
+                          'var(--warning-light)',
+                        color: 
+                          resident.status === 'Approved' ? 'var(--success)' : 
+                          resident.status === 'Rejected' ? 'var(--accent)' : 
+                          'var(--warning)'
+                      }}>
+                        {resident.status || 'Pending'}
+                      </span>
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -389,7 +393,6 @@ export default function Residents() {
         )}
       </div>
 
-      {/* Add / Edit Drawer Modal */}
       {isFormOpen && (
         <div style={{
           position: 'fixed',
@@ -517,7 +520,6 @@ export default function Residents() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {isDeleteOpen && (
         <div style={{
           position: 'fixed',
@@ -589,7 +591,6 @@ export default function Residents() {
         </div>
       )}
 
-      {/* Animations style injector */}
       <style>{`
         .table-row-hover:hover {
           background-color: var(--primary-light) !important;

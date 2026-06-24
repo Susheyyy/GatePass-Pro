@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, LogIn, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, LogIn, ShieldCheck, Info } from 'lucide-react';
+import { residentApi } from '../services/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -9,29 +10,67 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const targetEmail = "admin@gatepass.com";
-  const targetPassword = "admin123";
+  const targetAdminEmail = "admin@gatepass.com";
+  const targetAdminPassword = "admin123";
+  const defaultResidentPassword = "resident123";
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setValidationError('');
 
-    if (!email.includes('@')) {
+    const formattedEmail = email.trim().toLowerCase();
+
+    if (!formattedEmail.includes('@')) {
       setValidationError('Enter a valid email address to continue');
       setIsLoading(false);
       return;
     }
 
-    // Simulate a brief premium loading animation
-    setTimeout(() => {
-      if (email === targetEmail && password === targetPassword) {
-        localStorage.setItem('gatepass_token', 'true');
-        navigate('/');
-      } else {
+    try {
+      setTimeout(async () => {
+        if (formattedEmail === targetAdminEmail && password === targetAdminPassword) {
+          localStorage.setItem('gatepass_token', 'true');
+          localStorage.setItem('gatepass_role', 'admin');
+          localStorage.removeItem('gatepass_resident_id');
+          localStorage.removeItem('gatepass_resident_email');
+          setIsLoading(false);
+          navigate('/');
+          return;
+        }
+
+        if (password === defaultResidentPassword) {
+          try {
+            const residentsList = await residentApi.getAll();
+            const matchedResident = residentsList.find(r => {
+              const firstName = r.name.trim().split(' ')[0].toLowerCase();
+              const flatClean = r.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const expectedEmail = `${firstName}.${flatClean}@gatepass.com`;
+              return formattedEmail === expectedEmail || r.email.toLowerCase() === formattedEmail;
+            });
+
+            if (matchedResident) {
+              localStorage.setItem('gatepass_token', 'true');
+              localStorage.setItem('gatepass_role', 'resident');
+              localStorage.setItem('gatepass_resident_id', matchedResident._id);
+              localStorage.setItem('gatepass_resident_email', matchedResident.email);
+              setIsLoading(false);
+              navigate('/resident-dashboard');
+              return;
+            }
+          } catch (err) {
+            console.error('Error verifying resident account:', err);
+          }
+        }
+
         setValidationError('Access Denied. Check email or password.');
         setIsLoading(false);
-      }
-    }, 800);
+      }, 700);
+
+    } catch (err) {
+      setValidationError('An error occurred. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -40,17 +79,17 @@ export default function Login() {
       display: 'flex', 
       justifyContent: 'center', 
       alignItems: 'center', 
-      height: '100vh', 
-      backgroundColor: '#0f172a', /* Deep Slate dark bg for contrasting the glowing circles */
-      overflow: 'hidden'
+      minHeight: '100vh', 
+      backgroundColor: '#0f172a',
+      overflow: 'hidden',
+      padding: '24px 12px'
     }}>
-      {/* Dynamic Background Glow Blobs */}
+
       <div className="glow-circle glow-primary"></div>
       <div className="glow-circle glow-secondary"></div>
 
-      {/* Glass Auth Card */}
-      <div className="glass-container">
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+      <div className="glass-container" style={{ position: 'relative', zIndex: 10 }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{ 
             display: 'inline-flex', 
             padding: '12px', 
@@ -65,7 +104,7 @@ export default function Login() {
             GatePass Pro
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '6px' }}>
-            Administrative Control Center Sign-In
+            Society Gate Administrative Control Center
           </p>
         </div>
         
@@ -93,7 +132,7 @@ export default function Login() {
             <div className="input-group">
               <input
                 type="email"
-                placeholder="admin@gatepass.com"
+                placeholder="e.g. admin@gatepass.com or rajesh@gmail.com"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setValidationError(''); }}
                 required
@@ -104,7 +143,7 @@ export default function Login() {
             </div>
           </div>
 
-          <div style={{ marginBottom: '28px' }}>
+          <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '8px' }}>
               Password
             </label>
@@ -125,7 +164,7 @@ export default function Login() {
           <button 
             type="submit" 
             className="btn-global btn-primary" 
-            style={{ width: '100%', fontSize: '1rem', height: '48px' }}
+            style={{ width: '100%', fontSize: '1rem', height: '48px', marginBottom: '24px' }}
             disabled={isLoading}
           >
             {isLoading ? (
@@ -136,20 +175,38 @@ export default function Login() {
                 borderTopColor: '#fff',
                 borderRadius: '50%',
                 animation: 'spin 0.6s linear infinite',
-                display: 'inline-block',
-                marginRight: '8px'
+                display: 'inline-block'
               }}></span>
             ) : (
               <>
                 <LogIn size={18} />
-                <span>Sign In to System</span>
+                <span>Sign In</span>
               </>
             )}
           </button>
         </form>
+
+        <div style={{
+          backgroundColor: 'rgba(15, 23, 42, 0.03)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          fontSize: '0.8rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700', color: 'var(--text-main)' }}>
+            <Info size={14} className="text-primary" />
+            <span>Developer Login Help:</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: 'var(--text-muted)' }}>
+            <div><strong>Admin/Manager:</strong> admin@gatepass.com / <code style={{ color: 'var(--primary)', fontWeight: 'bold' }}>admin123</code></div>
+            <div><strong>Citizen/Resident:</strong> firstname.flatnumber@gatepass.com / <code style={{ color: 'var(--primary)', fontWeight: 'bold' }}>resident123</code> (e.g. <code style={{ color: 'var(--primary)' }}>rajesh.a101@gatepass.com</code>)</div>
+          </div>
+        </div>
       </div>
       
-      {/* Simple global keyframes inline style for loading spinner */}
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
