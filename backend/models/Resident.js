@@ -31,6 +31,23 @@ const residentSchema = new mongoose.Schema({
     type: String,
     enum: ['Pending', 'Approved', 'Rejected'],
     default: 'Pending'
+  },
+  gmail: {
+    type: String,
+    required: [true, 'Gmail address is required'],
+    trim: true,
+    lowercase: true
+  },
+  otp: {
+    type: String
+  },
+  password: {
+    type: String,
+    default: 'resident123'
+  },
+  isFirstLogin: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: true

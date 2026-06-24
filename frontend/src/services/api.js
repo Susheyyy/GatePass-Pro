@@ -9,8 +9,12 @@ const DEFAULT_RESIDENTS = [
     name: 'Rajesh Kumar',
     mobile: '9876543210',
     email: 'rajesh.a101@gatepass.com',
+    gmail: 'rajesh@gmail.com',
     members: 4,
     status: 'Pending',
+    otp: '654321',
+    password: 'resident123',
+    isFirstLogin: true,
     createdAt: new Date().toISOString()
   },
   {
@@ -19,18 +23,12 @@ const DEFAULT_RESIDENTS = [
     name: 'Priya Sharma',
     mobile: '9812345678',
     email: 'priya.b304@gatepass.com',
+    gmail: 'priya@gmail.com',
     members: 3,
     status: 'Approved',
-    createdAt: new Date().toISOString()
-  },
-  {
-    _id: 'mock-3',
-    flatNo: 'C-502',
-    name: 'Vikram Singh',
-    mobile: '9988776655',
-    email: 'vikram.c502@gatepass.com',
-    members: 5,
-    status: 'Rejected',
+    otp: '',
+    password: 'securepassword1',
+    isFirstLogin: false,
     createdAt: new Date().toISOString()
   }
 ];
@@ -68,20 +66,28 @@ export const residentApi = {
 
   create: async (residentData) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}`, {
-        ...residentData,
-        status: 'Pending'
-      });
-      return response.data;
+      const response = await axios.post(`${API_BASE_URL}`, residentData);
+      const created = response.data;
+      return created;
     } catch (error) {
       console.warn('Backend offline, saving to LocalStorage:', error.message);
       const list = getLocalResidents();
+      const firstName = residentData.name.trim().split(' ')[0].toLowerCase();
+      const flatClean = residentData.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
       const newResident = {
         ...residentData,
+        email: generatedEmail,
         status: 'Pending',
+        otp: generatedOtp,
+        password: 'resident123',
+        isFirstLogin: true,
         _id: 'mock-' + Math.random().toString(36).substr(2, 9),
         createdAt: new Date().toISOString()
       };
+      
       list.push(newResident);
       saveLocalResidents(list);
       return newResident;
@@ -97,7 +103,16 @@ export const residentApi = {
       const list = getLocalResidents();
       const index = list.findIndex(r => r._id === id);
       if (index !== -1) {
-        list[index] = { ...list[index], ...residentData };
+        if (residentData.password && residentData.otp) {
+          if (list[index].otp !== residentData.otp) {
+            throw new Error('Invalid verification OTP');
+          }
+          list[index].password = residentData.password;
+          list[index].isFirstLogin = false;
+          list[index].otp = '';
+        } else {
+          list[index] = { ...list[index], ...residentData };
+        }
         saveLocalResidents(list);
         return list[index];
       }

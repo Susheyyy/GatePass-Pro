@@ -1,6 +1,16 @@
 const Resident = require('../models/Resident');
+const nodemailer = require('nodemailer');
 
-// @route   GET /api/residents
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_PORT === '465',
+  auth: {
+    user: process.env.SMTP_MAIL,
+    pass: process.env.SMTP_PASSWORD
+  }
+});
+
 const getResidents = async (req, res) => {
   try {
     const { search } = req.query;
@@ -21,22 +31,46 @@ const getResidents = async (req, res) => {
   }
 };
 
-// @route   POST /api/residents - create resident
 const addResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, email, members } = req.body;
+    const { flatNo, name, mobile, gmail, members } = req.body;
     
-    if (!flatNo || !name || !mobile || !email || !members) {
+    if (!flatNo || !name || !mobile || !gmail || !members) {
       return res.status(400).json({ message: 'All fields are required' });
     }
+    
+    const firstName = name.trim().split(' ')[0].toLowerCase();
+    const flatClean = flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+    
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     
     const resident = await Resident.create({
       flatNo,
       name,
       mobile,
-      email,
-      members
+      email: generatedEmail,
+      gmail,
+      members,
+      otp: generatedOtp,
+      password: 'resident123',
+      isFirstLogin: true
     });
+    
+    const link = `http://localhost:5173/login?email=${generatedEmail}&otp=${generatedOtp}`;
+    
+    const mailOptions = {
+      from: process.env.SMTP_MAIL,
+      to: gmail,
+      subject: 'GatePass Pro - Resident Account Created',
+      text: `Hello ${name},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}\n\nUpon first login, you will be required to change your password using the OTP.`
+    };
+    
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (mailError) {
+      console.error(mailError);
+    }
     
     res.status(201).json(resident);
   } catch (error) {
@@ -44,22 +78,30 @@ const addResident = async (req, res) => {
   }
 };
 
-// @route   PUT /api/residents/:id (update resident details)
 const updateResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, email, members, status } = req.body;
+    const { flatNo, name, mobile, gmail, members, status, password, otp } = req.body;
     const resident = await Resident.findById(req.params.id);
     
     if (!resident) {
       return res.status(404).json({ message: 'Resident not found' });
     }
     
-    resident.flatNo = flatNo || resident.flatNo;
-    resident.name = name || resident.name;
-    resident.mobile = mobile || resident.mobile;
-    resident.email = email || resident.email;
-    resident.members = members !== undefined ? members : resident.members;
-    resident.status = status || resident.status;
+    if (password && otp) {
+      if (resident.otp !== otp) {
+        return res.status(400).json({ message: 'Invalid verification OTP' });
+      }
+      resident.password = password;
+      resident.isFirstLogin = false;
+      resident.otp = '';
+    } else {
+      resident.flatNo = flatNo || resident.flatNo;
+      resident.name = name || resident.name;
+      resident.mobile = mobile || resident.mobile;
+      resident.gmail = gmail || resident.gmail;
+      resident.members = members !== undefined ? members : resident.members;
+      resident.status = status || resident.status;
+    }
     
     const updatedResident = await resident.save();
     res.status(200).json(updatedResident);
@@ -68,7 +110,6 @@ const updateResident = async (req, res) => {
   }
 };
 
-// @route   DELETE /api/residents/:id (delete resident info)
 const deleteResident = async (req, res) => {
   try {
     const resident = await Resident.findById(req.params.id);

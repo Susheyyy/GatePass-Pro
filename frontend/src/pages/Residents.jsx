@@ -31,7 +31,7 @@ export default function Residents() {
     flatNo: '',
     name: '',
     mobile: '',
-    email: '',
+    gmail: '',
     members: 1
   });
 
@@ -73,7 +73,7 @@ export default function Residents() {
       flatNo: '',
       name: '',
       mobile: '',
-      email: '',
+      gmail: '',
       members: 1
     });
     setFormMode('add');
@@ -85,7 +85,7 @@ export default function Residents() {
       flatNo: resident.flatNo,
       name: resident.name,
       mobile: resident.mobile,
-      email: resident.email,
+      gmail: resident.gmail || '',
       members: resident.members
     });
     setSelectedResidentId(resident._id);
@@ -294,7 +294,7 @@ export default function Residents() {
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Flat No</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resident Name</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mobile</th>
-                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Login Username</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Members</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
@@ -477,11 +477,11 @@ export default function Residents() {
               />
 
               <FormInput
-                label="Email Address"
-                name="email"
+                label="Gmail Address"
+                name="gmail"
                 type="email"
                 placeholder="e.g. rajesh@gmail.com"
-                value={formData.email}
+                value={formData.gmail}
                 onChange={handleInputChange}
                 icon={Mail}
                 required
