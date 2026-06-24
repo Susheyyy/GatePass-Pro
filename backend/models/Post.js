@@ -20,7 +20,13 @@ const postSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Flat number is required'],
     trim: true
-  }
+  },
+  comments: [{
+    text: { type: String, required: true },
+    authorName: { type: String, required: true },
+    flatNo: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });

@@ -14,6 +14,7 @@ const visitorSchema = new mongoose.Schema({
   },
   mobile: {
     type: String,
+    required: [true, 'Mobile number is required'],
     trim: true
   },
   flatNo: {
@@ -33,6 +34,12 @@ const visitorSchema = new mongoose.Schema({
   time: {
     type: Date,
     default: Date.now
+  },
+  checkedInAt: {
+    type: Date
+  },
+  checkedOutAt: {
+    type: Date
   }
 }, {
   timestamps: true

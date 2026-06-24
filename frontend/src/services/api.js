@@ -2,36 +2,7 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/residents';
 
-const DEFAULT_RESIDENTS = [
-  {
-    _id: 'mock-1',
-    flatNo: 'A-101',
-    name: 'Rajesh Kumar',
-    mobile: '9876543210',
-    email: 'rajesh.a101@gatepass.com',
-    gmail: 'rajesh@gmail.com',
-    members: 4,
-    status: 'Pending',
-    otp: '654321',
-    password: 'resident123',
-    isFirstLogin: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    _id: 'mock-2',
-    flatNo: 'B-304',
-    name: 'Priya Sharma',
-    mobile: '9812345678',
-    email: 'priya.b304@gatepass.com',
-    gmail: 'priya@gmail.com',
-    members: 3,
-    status: 'Approved',
-    otp: '',
-    password: 'securepassword1',
-    isFirstLogin: false,
-    createdAt: new Date().toISOString()
-  }
-];
+const DEFAULT_RESIDENTS = [];
 
 const getLocalResidents = () => {
   const local = localStorage.getItem('gatepass_residents');
@@ -201,6 +172,10 @@ export const visitorApi = {
       if (params.flatNo) {
         list = list.filter(v => v.flatNo === params.flatNo);
       }
+      if (params.search) {
+        const searchRegex = new RegExp(params.search, 'i');
+        list = list.filter(v => searchRegex.test(v.name) || searchRegex.test(v.type) || (v.passcode && searchRegex.test(v.passcode)));
+      }
       return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
   },
@@ -232,7 +207,13 @@ export const visitorApi = {
       const list = getLocalVisitors();
       const index = list.findIndex(v => v._id === id);
       if (index !== -1) {
-        list[index] = { ...list[index], ...visitorData };
+        const updated = { ...list[index], ...visitorData };
+        if (visitorData.status === 'Checked In') {
+          updated.checkedInAt = new Date().toISOString();
+        } else if (visitorData.status === 'Checked Out') {
+          updated.checkedOutAt = new Date().toISOString();
+        }
+        list[index] = updated;
         saveLocalVisitors(list);
         return list[index];
       }
@@ -290,6 +271,30 @@ export const postApi = {
       list.push(newPost);
       saveLocalPosts(list);
       return newPost;
+    }
+  },
+  addComment: async (id, commentData) => {
+    try {
+      const response = await axios.post(`${POST_API_BASE_URL}/${id}/comments`, commentData);
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, adding comment in LocalStorage:', error.message);
+      const list = getLocalPosts();
+      const index = list.findIndex(p => p._id === id);
+      if (index !== -1) {
+        if (!list[index].comments) {
+          list[index].comments = [];
+        }
+        const newComment = {
+          ...commentData,
+          _id: 'mock-comment-' + Math.random().toString(36).substr(2, 9),
+          createdAt: new Date().toISOString()
+        };
+        list[index].comments.push(newComment);
+        saveLocalPosts(list);
+        return list[index];
+      }
+      throw new Error('Post not found in local storage');
     }
   }
 };

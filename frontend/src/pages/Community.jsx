@@ -14,6 +14,7 @@ export default function Community() {
   const [loading, setLoading] = useState(true);
   const [currentResident, setCurrentResident] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [commentInputs, setCommentInputs] = useState({});
 
   const [formData, setFormData] = useState({
     title: '',
@@ -67,6 +68,25 @@ export default function Community() {
       toast.error('Failed to publish post.');
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleCommentSubmit = async (e, postId) => {
+    e.preventDefault();
+    const commentText = commentInputs[postId]?.trim();
+    if (!commentText) return;
+    try {
+      const payload = {
+        text: commentText,
+        authorName: currentResident ? currentResident.name : 'System Admin',
+        flatNo: currentResident ? currentResident.flatNo : 'Admin'
+      };
+      const updatedPost = await postApi.addComment(postId, payload);
+      setPosts(prev => prev.map(p => p._id === postId ? { ...p, comments: updatedPost.comments } : p));
+      setCommentInputs(prev => ({ ...prev, [postId]: '' }));
+      toast.success('Comment added successfully!');
+    } catch (err) {
+      toast.error('Failed to add comment.');
     }
   };
 
@@ -134,9 +154,58 @@ export default function Community() {
                     {post.description}
                   </p>
 
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-light)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-light)' }}>
                     <Clock size={12} />
                     <span>{new Date(post.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-muted)' }}>
+                      Comments ({(post.comments || []).length})
+                    </div>
+                    
+                    {(post.comments || []).length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '10px', borderLeft: '2px solid var(--border)', marginBottom: '8px' }}>
+                        {post.comments.map((comment, index) => (
+                          <div key={comment._id || index} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-main)' }}>
+                                {comment.authorName} ({comment.flatNo})
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-light)' }}>
+                                {new Date(comment.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                              {comment.text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <form onSubmit={(e) => handleCommentSubmit(e, post._id)} style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="Write a comment..."
+                        value={commentInputs[post._id] || ''}
+                        onChange={(e) => setCommentInputs(prev => ({ ...prev, [post._id]: e.target.value }))}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border)',
+                          backgroundColor: 'var(--bg-card)',
+                          color: 'var(--text-main)',
+                          fontSize: '0.85rem',
+                          fontFamily: 'var(--font-sans)',
+                          outline: 'none'
+                        }}
+                      />
+                      <FormButton type="submit" variant="primary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
+                        Reply
+                      </FormButton>
+                    </form>
                   </div>
                 </div>
               ))}

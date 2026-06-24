@@ -5,6 +5,7 @@ import Residents from './pages/Residents';
 import ResidentDashboard from './pages/ResidentDashboard';
 import Profile from './pages/Profile';
 import Community from './pages/Community';
+import Visitors from './pages/Visitors';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastProvider } from './context/ToastContext';
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/visitors" element={
           <ProtectedRoute>
             <Layout>
+              <Visitors />
             </Layout>
           </ProtectedRoute>
         } />

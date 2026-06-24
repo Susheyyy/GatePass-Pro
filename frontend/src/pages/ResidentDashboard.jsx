@@ -521,11 +521,12 @@ export default function ResidentDashboard() {
               </div>
 
               <FormInput
-                label="Mobile Number (Optional)"
+                label="Mobile Number"
                 value={visitorForm.mobile}
                 onChange={(e) => setVisitorForm(prev => ({ ...prev, mobile: e.target.value }))}
                 icon={Phone}
                 placeholder="e.g. 9876543210"
+                required
               />
 
               <div style={{ display: 'flex', gap: '12px', marginTop: 'auto', paddingTop: '24px' }}>

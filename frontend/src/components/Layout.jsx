@@ -34,17 +34,6 @@ export default function Layout({ children }) {
     <div className="layout-wrapper">
       <header className="main-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ 
-            background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', 
-            color: 'white', 
-            padding: '8px', 
-            borderRadius: '10px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center' 
-          }}>
-            <Shield size={20} />
-          </div>
           <h1 style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.025em', color: 'var(--text-main)' }}>
             GatePass <span style={{ color: 'var(--primary)' }}>Pro</span>
           </h1>

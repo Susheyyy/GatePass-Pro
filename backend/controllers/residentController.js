@@ -84,7 +84,7 @@ const addResident = async (req, res) => {
 
 const updateResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage } = req.body;
+    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage, bio, location, address, clearDistress } = req.body;
     const resident = await Resident.findById(req.params.id);
     
     if (!resident) {
@@ -105,9 +105,12 @@ const updateResident = async (req, res) => {
       resident.gmail = gmail || resident.gmail;
       resident.members = members !== undefined ? members : resident.members;
       resident.status = status || resident.status;
-      resident.bio = bio || resident.bio;
-      resident.location = location || resident.location;
-      resident.address = address || resident.address;
+      resident.bio = bio !== undefined ? bio : resident.bio;
+      resident.location = location !== undefined ? location : resident.location;
+      resident.address = address !== undefined ? address : resident.address;
+      if (clearDistress) {
+        resident.distressMessages = [];
+      }
       if (distressMessage) {
         resident.distressMessages.push({ message: distressMessage });
       }

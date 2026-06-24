@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { residentApi } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
+import { useToast } from '../context/ToastContext';
 
 export default function Residents() {
+  const toast = useToast();
   const [residents, setResidents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -733,7 +735,23 @@ export default function Residents() {
               ))}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <FormButton 
+                onClick={async () => {
+                  try {
+                    const updated = await residentApi.update(selectedDistressResident._id, { clearDistress: true });
+                    setResidents(prev => prev.map(r => r._id === selectedDistressResident._id ? updated : r));
+                    setIsDistressOpen(false);
+                    setSelectedDistressResident(null);
+                    toast.success('Distress alerts resolved successfully!');
+                  } catch (err) {
+                    toast.error('Failed to resolve distress alerts.');
+                  }
+                }}
+                variant="primary"
+              >
+                Mark as Resolved
+              </FormButton>
               <FormButton 
                 onClick={() => { setIsDistressOpen(false); setSelectedDistressResident(null); }} 
                 variant="secondary"

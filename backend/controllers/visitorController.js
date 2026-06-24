@@ -11,7 +11,8 @@ const getVisitors = async (req, res) => {
       const searchRegex = new RegExp(search, 'i');
       query.$or = [
         { name: searchRegex },
-        { type: searchRegex }
+        { type: searchRegex },
+        { passcode: searchRegex }
       ];
     }
     const visitors = await Visitor.find(query).sort({ createdAt: -1 });
@@ -51,6 +52,11 @@ const updateVisitor = async (req, res) => {
     }
     if (status) {
       visitor.status = status;
+      if (status === 'Checked In') {
+        visitor.checkedInAt = new Date();
+      } else if (status === 'Checked Out') {
+        visitor.checkedOutAt = new Date();
+      }
     }
     const updatedVisitor = await visitor.save();
     res.status(200).json(updatedVisitor);

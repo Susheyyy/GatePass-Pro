@@ -11,7 +11,8 @@ import {
   MapPin, 
   Check, 
   LogOut, 
-  LogIn 
+  LogIn,
+  X 
 } from 'lucide-react';
 import { visitorApi } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
@@ -31,6 +32,7 @@ export default function Visitors() {
     flatNo: '',
     status: 'Approved'
   });
+  const [selectedVisitor, setSelectedVisitor] = useState(null);
 
   const fetchVisitors = async (query = '') => {
     setLoading(true);
@@ -153,7 +155,18 @@ export default function Visitors() {
               </thead>
               <tbody>
                 {visitors.map((visitor, idx) => (
-                  <tr key={visitor._id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(248, 250, 252, 0.5)' }}>
+                  <tr 
+                    key={visitor._id} 
+                    onClick={(e) => {
+                      if (e.target.closest('button')) return;
+                      setSelectedVisitor(visitor);
+                    }}
+                    style={{ 
+                      borderBottom: '1px solid var(--border)', 
+                      backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(248, 250, 252, 0.5)',
+                      cursor: 'pointer'
+                    }}
+                  >
                     <td style={{ padding: '16px', fontWeight: '700', color: 'var(--text-main)' }}>
                       <div>{visitor.name}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{visitor.mobile || 'No Mobile'}</div>
@@ -297,6 +310,7 @@ export default function Visitors() {
                 value={formData.mobile}
                 onChange={handleInputChange}
                 icon={Phone}
+                required
               />
 
               <FormInput
@@ -318,6 +332,118 @@ export default function Visitors() {
                 </FormButton>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedVisitor && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '500px',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '16px',
+            padding: '30px',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            position: 'relative',
+            border: '1px solid var(--border)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                Visitor Details
+              </h3>
+              <button 
+                onClick={() => setSelectedVisitor(null)} 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Name</span>
+                <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedVisitor.name}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Mobile</span>
+                <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedVisitor.mobile || 'No Mobile'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Visitor Type</span>
+                <span style={{ fontWeight: '700', color: 'var(--primary)' }}>{selectedVisitor.type}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Destination</span>
+                <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>Flat {selectedVisitor.flatNo}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Passcode</span>
+                <span style={{ fontWeight: '700', color: 'var(--accent)', fontFamily: 'monospace', fontSize: '1.1rem' }}>{selectedVisitor.passcode}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Status</span>
+                <span style={{
+                  display: 'inline-flex',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: '700',
+                  backgroundColor: 
+                    selectedVisitor.status === 'Checked In' ? 'var(--success-light)' : 
+                    selectedVisitor.status === 'Checked Out' ? 'var(--border)' : 
+                    'var(--warning-light)',
+                  color: 
+                    selectedVisitor.status === 'Checked In' ? 'var(--success)' : 
+                    selectedVisitor.status === 'Checked Out' ? 'var(--text-muted)' : 
+                    'var(--warning)'
+                }}>{selectedVisitor.status}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-main)' }}>Timeline Logs</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Pre-approved:</span>
+                    <span style={{ color: 'var(--text-main)', fontWeight: '500' }}>
+                      {new Date(selectedVisitor.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Checked In:</span>
+                    <span style={{ color: 'var(--text-main)', fontWeight: '500' }}>
+                      {selectedVisitor.checkedInAt ? new Date(selectedVisitor.checkedInAt).toLocaleString() : 'Not Checked In'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Checked Out:</span>
+                    <span style={{ color: 'var(--text-main)', fontWeight: '500' }}>
+                      {selectedVisitor.checkedOutAt ? new Date(selectedVisitor.checkedOutAt).toLocaleString() : 'Not Checked Out'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+              <FormButton onClick={() => setSelectedVisitor(null)} variant="secondary">
+                Close
+              </FormButton>
+            </div>
           </div>
         </div>
       )}
