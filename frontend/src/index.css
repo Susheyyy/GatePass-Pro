@@ -3,30 +3,29 @@
 :root {
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   
-  /* Cohesive Harmonious Palette */
-  --primary: #6366f1; /* Premium Indigo */
+  --primary: #6366f1; 
   --primary-hover: #4f46e5;
   --primary-light: rgba(99, 102, 241, 0.08);
   --primary-border: rgba(99, 102, 241, 0.15);
   
-  --success: #10b981; /* Emerald */
+  --success: #10b981;
   --success-hover: #059669;
   --success-light: rgba(16, 185, 129, 0.1);
   
-  --warning: #f59e0b; /* Amber */
+  --warning: #f59e0b;
   --warning-light: rgba(245, 158, 11, 0.1);
   
-  --accent: #f43f5e; /* Rose */
+  --accent: #f43f5e; 
   --accent-hover: #e11d48;
   --accent-light: rgba(244, 63, 94, 0.1);
   
-  --bg-main: #f8fafc; /* Sleek light slate */
+  --bg-main: #ffffff; 
   --bg-card: #ffffff;
-  --text-main: #0f172a; /* Slate 900 */
-  --text-muted: #64748b; /* Slate 500 */
-  --text-light: #94a3b8; /* Slate 400 */
+  --text-main: #0f172a;
+  --text-muted: #64748b; 
+  --text-light: #94a3b8;
   
-  --border: #e2e8f0; /* Slate 200 */
+  --border: #e2e8f0; 
   --border-focus: #6366f1;
   
   --radius-sm: 8px;
@@ -56,7 +55,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom modern scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -72,7 +70,6 @@ body {
   background: #94a3b8;
 }
 
-/* Global Container Styles */
 .app-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -80,14 +77,10 @@ body {
 
 .content-card {
   background: var(--bg-card);
-  padding: 28px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
+  padding: 24px 0;
   transition: var(--transition);
 }
 
-/* Input Styles */
 .input-group {
   position: relative;
   display: flex;
@@ -124,7 +117,6 @@ body {
   color: var(--primary);
 }
 
-/* Button Global Styles */
 .btn-global {
   padding: 12px 24px;
   font-family: var(--font-sans);
@@ -166,7 +158,6 @@ body {
   transform: translateY(-1px);
 }
 
-/* Glassmorphism helpers for Auth Screen */
 .glass-container {
   position: relative;
   width: 100%;
@@ -202,7 +193,7 @@ body {
 .glow-secondary {
   width: 280px;
   height: 280px;
-  background: #a855f7; /* Purple */
+  background: #a855f7;
   bottom: -50px;
   right: -50px;
   animation-delay: -3s;
@@ -217,7 +208,6 @@ body {
   }
 }
 
-/* Layout Framework */
 .layout-wrapper {
   display: flex;
   min-height: 100vh;
@@ -286,7 +276,6 @@ body {
   background-color: var(--bg-main);
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
   .layout-body {
     flex-direction: column;
