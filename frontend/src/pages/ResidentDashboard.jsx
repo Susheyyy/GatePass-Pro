@@ -19,8 +19,10 @@ import {
 } from 'lucide-react';
 import { residentApi, visitorApi } from '../services/api';
 import { FormButton, FormInput } from '../components/FormComponents';
+import { useToast } from '../context/ToastContext';
 
 export default function ResidentDashboard() {
+  const toast = useToast();
   const [resident, setResident] = useState(null);
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +81,7 @@ export default function ResidentDashboard() {
         setVisitors(visitorList);
       }
     } catch (err) {
-      alert('Failed to update verification status. Please try again.');
+      toast.error('Failed to update verification status. Please try again.');
     } finally {
       setUpdating(false);
     }
@@ -96,8 +98,9 @@ export default function ResidentDashboard() {
       setVisitors(prev => [newVisitor, ...prev]);
       setIsPassModalOpen(false);
       setVisitorForm({ name: '', type: 'Guest', mobile: '' });
+      toast.success('Pre-approved pass created successfully!');
     } catch (err) {
-      alert('Failed to create pre-approved pass.');
+      toast.error('Failed to create pre-approved pass.');
     }
   };
 
@@ -657,8 +660,9 @@ export default function ResidentDashboard() {
                   });
                   setResident(updated);
                   setDistressMessage('');
+                  toast.success('Message sent to gate controls!');
                 } catch (err) {
-                  alert('Failed to send message. Please try again.');
+                  toast.error('Failed to send message. Please try again.');
                 } finally {
                   setSendingMessage(false);
                 }

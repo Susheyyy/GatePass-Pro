@@ -3,8 +3,11 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Residents from './pages/Residents';
 import ResidentDashboard from './pages/ResidentDashboard';
+import Profile from './pages/Profile';
+import Community from './pages/Community';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import { ToastProvider } from './context/ToastContext';
 
 function HomeRedirect() {
   const role = localStorage.getItem('gatepass_role') || 'admin';
@@ -16,7 +19,8 @@ function HomeRedirect() {
 
 export default function App() {
   return (
-    <Router>
+    <ToastProvider>
+      <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
 
@@ -50,7 +54,24 @@ export default function App() {
             </Layout>
           </ProtectedRoute>
         } />
+
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <Layout>
+              <Profile />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/community" element={
+          <ProtectedRoute>
+            <Layout>
+              <Community />
+            </Layout>
+          </ProtectedRoute>
+        } />
       </Routes>
     </Router>
+  </ToastProvider>
   );
 }

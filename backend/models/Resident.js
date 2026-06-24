@@ -52,7 +52,23 @@ const residentSchema = new mongoose.Schema({
   distressMessages: [{
     message: { type: String, required: true },
     createdAt: { type: Date, default: Date.now }
-  }]
+  }],
+  communityId: {
+    type: String,
+    unique: true
+  },
+  bio: {
+    type: String,
+    default: 'Resident of GatePass Pro Community.'
+  },
+  location: {
+    type: String,
+    default: 'GatePass Residency'
+  },
+  address: {
+    type: String,
+    default: ''
+  }
 }, {
   timestamps: true
 });

@@ -11,7 +11,8 @@ export function FormInput({
   error = '',
   min,
   max,
-  name
+  name,
+  disabled = false
 }) {
   return (
     <div style={{ marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -30,9 +31,13 @@ export function FormInput({
           required={required}
           min={min}
           max={max}
+          disabled={disabled}
           className="input-field"
           style={{
-            paddingLeft: Icon ? '46px' : '16px'
+            paddingLeft: Icon ? '46px' : '16px',
+            backgroundColor: disabled ? 'rgba(0, 0, 0, 0.04)' : undefined,
+            color: disabled ? 'var(--text-muted)' : undefined,
+            cursor: disabled ? 'not-allowed' : undefined
           }}
         />
         {Icon && <Icon className="input-icon" size={20} />}
@@ -70,8 +75,7 @@ export function FormButton({
     if (variant === 'danger') {
       base = {
         background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
-        color: 'white',
-        boxShadow: '0 4px 12px rgba(244, 63, 94, 0.2)'
+        color: 'white'
       };
     } else if (variant === 'secondary') {
       base = {

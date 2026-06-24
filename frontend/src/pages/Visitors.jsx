@@ -15,8 +15,10 @@ import {
 } from 'lucide-react';
 import { visitorApi } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
+import { useToast } from '../context/ToastContext';
 
 export default function Visitors() {
+  const toast = useToast();
   const [visitors, setVisitors] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -70,8 +72,9 @@ export default function Visitors() {
         status: 'Approved'
       });
       fetchVisitors(searchQuery);
+      toast.success('Visitor registered successfully!');
     } catch (err) {
-      alert('Failed to register visitor.');
+      toast.error('Failed to register visitor.');
     }
   };
 
@@ -79,8 +82,9 @@ export default function Visitors() {
     try {
       await visitorApi.update(id, { status: newStatus });
       fetchVisitors(searchQuery);
+      toast.success('Visitor status updated!');
     } catch (err) {
-      alert('Failed to update visitor status.');
+      toast.error('Failed to update visitor status.');
     }
   };
 
@@ -89,8 +93,9 @@ export default function Visitors() {
     try {
       await visitorApi.delete(id);
       fetchVisitors(searchQuery);
+      toast.success('Visitor log removed.');
     } catch (err) {
-      alert('Failed to remove visitor.');
+      toast.error('Failed to remove visitor.');
     }
   };
 

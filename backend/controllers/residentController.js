@@ -44,6 +44,7 @@ const addResident = async (req, res) => {
     const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
     
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const generatedCommunityId = Math.floor(10000 + Math.random() * 90000).toString();
     
     const resident = await Resident.create({
       flatNo,
@@ -54,7 +55,9 @@ const addResident = async (req, res) => {
       members,
       otp: generatedOtp,
       password: 'resident123',
-      isFirstLogin: true
+      isFirstLogin: true,
+      communityId: generatedCommunityId,
+      address: `Flat ${flatNo}, GatePass Residency`
     });
     
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -102,6 +105,9 @@ const updateResident = async (req, res) => {
       resident.gmail = gmail || resident.gmail;
       resident.members = members !== undefined ? members : resident.members;
       resident.status = status || resident.status;
+      resident.bio = bio || resident.bio;
+      resident.location = location || resident.location;
+      resident.address = address || resident.address;
       if (distressMessage) {
         resident.distressMessages.push({ message: distressMessage });
       }

@@ -189,7 +189,6 @@ export default function Login() {
             justifyContent: 'center',
             boxShadow: '0 8px 16px rgba(50, 11, 53, 0.2)'
           }}>
-            <Shield size={26} />
           </div>
           <div>
             <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.03em' }}>
@@ -349,7 +348,6 @@ export default function Login() {
                     backgroundColor: 'white'
                   }}
                 />
-                <ShieldCheck size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-light)' }} />
               </div>
             </div>
 

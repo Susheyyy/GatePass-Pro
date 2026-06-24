@@ -87,6 +87,10 @@ export const residentApi = {
         otp: generatedOtp,
         password: 'resident123',
         isFirstLogin: true,
+        communityId: Math.floor(10000 + Math.random() * 90000).toString(),
+        bio: 'Resident of GatePass Pro Community.',
+        location: 'GatePass Residency',
+        address: `Flat ${residentData.flatNo}, GatePass Residency`,
         _id: 'mock-' + Math.random().toString(36).substr(2, 9),
         createdAt: new Date().toISOString()
       };
@@ -245,6 +249,47 @@ export const visitorApi = {
       const filtered = list.filter(v => v._id !== id);
       saveLocalVisitors(filtered);
       return { message: 'Visitor removed successfully' };
+    }
+  }
+};
+
+const POST_API_BASE_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/residents', '/posts') : 'http://localhost:5000/api/posts';
+
+const getLocalPosts = () => {
+  const local = localStorage.getItem('gatepass_posts');
+  if (!local) return [];
+  return JSON.parse(local);
+};
+
+const saveLocalPosts = (posts) => {
+  localStorage.setItem('gatepass_posts', JSON.stringify(posts));
+};
+
+export const postApi = {
+  getAll: async () => {
+    try {
+      const response = await axios.get(POST_API_BASE_URL);
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, using LocalStorage fallback for posts:', error.message);
+      return getLocalPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+  },
+  create: async (postData) => {
+    try {
+      const response = await axios.post(POST_API_BASE_URL, postData);
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, saving post to LocalStorage:', error.message);
+      const list = getLocalPosts();
+      const newPost = {
+        ...postData,
+        _id: 'mock-post-' + Math.random().toString(36).substr(2, 9),
+        createdAt: new Date().toISOString()
+      };
+      list.push(newPost);
+      saveLocalPosts(list);
+      return newPost;
     }
   }
 };

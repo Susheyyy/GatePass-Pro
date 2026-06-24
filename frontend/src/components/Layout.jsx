@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, LogOut, Shield, Bell, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, LogOut, Shield, Bell, CheckCircle2, User, MessageSquare } from 'lucide-react';
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
@@ -21,9 +21,13 @@ export default function Layout({ children }) {
         { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
         { path: '/residents', label: 'Residents', icon: <Users size={18} /> },
         { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> },
+        { path: '/community', label: 'Community', icon: <MessageSquare size={18} /> },
+        { path: '/profile', label: 'My Profile', icon: <User size={18} /> }
       ]
     : [
         { path: '/resident-dashboard', label: 'Resident Dashboard', icon: <LayoutDashboard size={18} /> },
+        { path: '/community', label: 'Community', icon: <MessageSquare size={18} /> },
+        { path: '/profile', label: 'My Profile', icon: <User size={18} /> }
       ];
 
   return (
