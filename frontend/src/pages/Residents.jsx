@@ -1,0 +1,617 @@
+import { useState, useEffect } from 'react';
+import { 
+  Users, 
+  UserPlus, 
+  Search, 
+  Edit3, 
+  Trash2, 
+  Home, 
+  User, 
+  Phone, 
+  Mail, 
+  X, 
+  Check, 
+  Info,
+  Building
+} from 'lucide-react';
+import { residentApi } from '../services/api';
+import { FormInput, FormButton } from '../components/FormComponents';
+
+export default function Residents() {
+  const [residents, setResidents] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Form states
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState('add'); // 'add' or 'edit'
+  const [selectedResidentId, setSelectedResidentId] = useState(null);
+  
+  const [formData, setFormData] = useState({
+    flatNo: '',
+    name: '',
+    mobile: '',
+    email: '',
+    members: 1
+  });
+
+  // Delete states
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [residentToDelete, setResidentToDelete] = useState(null);
+
+  // Success Notification banner
+  const [notification, setNotification] = useState('');
+
+  const fetchResidents = async (query = '') => {
+    setLoading(true);
+    try {
+      const data = await residentApi.getAll(query);
+      setResidents(data);
+      setError('');
+    } catch (err) {
+      setError('Failed to fetch residents data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchResidents();
+  }, []);
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    fetchResidents(val);
+  };
+
+  const showNotification = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(''), 4000);
+  };
+
+  // Open Form for Add
+  const handleOpenAdd = () => {
+    setFormData({
+      flatNo: '',
+      name: '',
+      mobile: '',
+      email: '',
+      members: 1
+    });
+    setFormMode('add');
+    setIsFormOpen(true);
+  };
+
+  // Open Form for Edit
+  const handleOpenEdit = (resident) => {
+    setFormData({
+      flatNo: resident.flatNo,
+      name: resident.name,
+      mobile: resident.mobile,
+      email: resident.email,
+      members: resident.members
+    });
+    setSelectedResidentId(resident._id);
+    setFormMode('edit');
+    setIsFormOpen(true);
+  };
+
+  // Handle Form Change
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'members' ? parseInt(value) || 1 : value
+    }));
+  };
+
+  // Submit Form
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (formMode === 'add') {
+        await residentApi.create(formData);
+        showNotification('New resident added successfully!');
+      } else {
+        await residentApi.update(selectedResidentId, formData);
+        showNotification('Resident details updated successfully!');
+      }
+      setIsFormOpen(false);
+      fetchResidents(searchQuery);
+    } catch (err) {
+      setError('Operation failed. Please try again.');
+    }
+  };
+
+  // Trigger Delete Confirmation
+  const triggerDelete = (resident) => {
+    setResidentToDelete(resident);
+    setIsDeleteOpen(true);
+  };
+
+  // Confirm Delete
+  const confirmDelete = async () => {
+    if (!residentToDelete) return;
+    try {
+      await residentApi.delete(residentToDelete._id);
+      showNotification(`Resident ${residentToDelete.name} has been deleted.`);
+      setIsDeleteOpen(false);
+      setResidentToDelete(null);
+      fetchResidents(searchQuery);
+    } catch (err) {
+      setError('Could not delete resident. Please try again.');
+    }
+  };
+
+  // Stats calculators
+  const totalResidents = residents.length;
+  const totalMembers = residents.reduce((acc, curr) => acc + (parseInt(curr.members) || 0), 0);
+  const occupiedUnits = new Set(residents.map(r => r.flatNo)).size;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+      
+      {/* Header Panel */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+        <div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em' }}>
+            Resident Management
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+            Maintain database records, apartment occupation, and resident family members.
+          </p>
+        </div>
+        
+        <FormButton onClick={handleOpenAdd} variant="primary">
+          <UserPlus size={18} />
+          <span>Add Resident</span>
+        </FormButton>
+      </div>
+
+      {/* Success Banner Alert */}
+      {notification && (
+        <div style={{
+          backgroundColor: 'var(--success-light)',
+          color: 'var(--success)',
+          padding: '16px 20px',
+          borderRadius: '12px',
+          fontSize: '0.95rem',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          border: '1px solid rgba(16, 185, 129, 0.15)',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <Check size={18} style={{ strokeWidth: 3 }} />
+          <span>{notification}</span>
+        </div>
+      )}
+
+      {/* Stats Cards Row */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+        gap: '24px' 
+      }}>
+        <div className="content-card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ 
+            color: 'var(--primary)', 
+            backgroundColor: 'var(--primary-light)', 
+            padding: '14px', 
+            borderRadius: '14px' 
+          }}>
+            <Users size={24} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Active Profiles</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-main)' }}>{totalResidents}</div>
+          </div>
+        </div>
+
+        <div className="content-card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ 
+            color: 'var(--success)', 
+            backgroundColor: 'var(--success-light)', 
+            padding: '14px', 
+            borderRadius: '14px' 
+          }}>
+            <Users size={24} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Total Members</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-main)' }}>{totalMembers}</div>
+          </div>
+        </div>
+
+        <div className="content-card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ 
+            color: '#e28743', 
+            backgroundColor: 'rgba(226, 135, 67, 0.08)', 
+            padding: '14px', 
+            borderRadius: '14px' 
+          }}>
+            <Building size={24} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Occupied Flats</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-main)' }}>{occupiedUnits}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Table Content Card */}
+      <div className="content-card">
+        
+        {/* Search Bar */}
+        <div style={{ marginBottom: '24px', display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <div className="input-group" style={{ flex: 1 }}>
+            <input
+              type="text"
+              placeholder="Search by Flat Number or Resident Name..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="input-field"
+            />
+            <Search className="input-icon" size={20} />
+          </div>
+        </div>
+
+        {/* List Table */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              border: '3px solid var(--border)',
+              borderTopColor: 'var(--primary)',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+              margin: '0 auto 12px auto'
+            }}></div>
+            <span>Loading residents...</span>
+          </div>
+        ) : error ? (
+          <div style={{ 
+            padding: '24px', 
+            backgroundColor: 'var(--accent-light)', 
+            color: 'var(--accent)', 
+            borderRadius: '12px',
+            textAlign: 'center',
+            fontWeight: '600'
+          }}>
+            {error}
+          </div>
+        ) : residents.length === 0 ? (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '50px 0', 
+            color: 'var(--text-light)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <Info size={40} />
+            <div>
+              <h4 style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '1.05rem' }}>No Residents Found</h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {searchQuery ? 'Try matching different search keywords.' : 'Add your first resident using the button above.'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table-bootstrap" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Flat No</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resident Name</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mobile</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Members</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {residents.map((resident, idx) => (
+                  <tr 
+                    key={resident._id} 
+                    style={{ 
+                      borderBottom: '1px solid var(--border)',
+                      backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(248, 250, 252, 0.5)',
+                      transition: 'var(--transition)'
+                    }}
+                    className="table-row-hover"
+                  >
+                    <td style={{ padding: '16px', fontWeight: '700', color: 'var(--primary)' }}>
+                      {resident.flatNo}
+                    </td>
+                    <td style={{ padding: '16px', fontWeight: '600', color: 'var(--text-main)' }}>
+                      {resident.name}
+                    </td>
+                    <td style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      {resident.mobile}
+                    </td>
+                    <td style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      {resident.email}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center', fontWeight: '700', color: 'var(--text-main)' }}>
+                      {resident.members}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button 
+                          onClick={() => handleOpenEdit(resident)}
+                          title="Edit Resident"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            transition: 'var(--transition)'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'var(--primary-light)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => triggerDelete(resident)}
+                          title="Delete Resident"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            transition: 'var(--transition)'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.backgroundColor = 'var(--accent-light)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Add / Edit Drawer Modal */}
+      {isFormOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '460px',
+            backgroundColor: 'var(--bg-card)',
+            height: '100%',
+            boxShadow: '-10px 0 30px rgba(15, 23, 42, 0.1)',
+            padding: '36px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+            animation: 'slideLeft 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                {formMode === 'add' ? 'Add Society Resident' : 'Edit Resident Profile'}
+              </h3>
+              <button 
+                onClick={() => setIsFormOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: '6px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'var(--transition)'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--border)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+              <FormInput
+                label="Flat Number"
+                name="flatNo"
+                placeholder="e.g. A-101"
+                value={formData.flatNo}
+                onChange={handleInputChange}
+                icon={Home}
+                required
+              />
+
+              <FormInput
+                label="Resident Full Name"
+                name="name"
+                placeholder="e.g. Rajesh Kumar"
+                value={formData.name}
+                onChange={handleInputChange}
+                icon={User}
+                required
+              />
+
+              <FormInput
+                label="Mobile Number"
+                name="mobile"
+                placeholder="e.g. 9876543210"
+                value={formData.mobile}
+                onChange={handleInputChange}
+                icon={Phone}
+                required
+              />
+
+              <FormInput
+                label="Email Address"
+                name="email"
+                type="email"
+                placeholder="e.g. rajesh@gmail.com"
+                value={formData.email}
+                onChange={handleInputChange}
+                icon={Mail}
+                required
+              />
+
+              <FormInput
+                label="Total Family Members"
+                name="members"
+                type="number"
+                placeholder="Number of members"
+                value={formData.members}
+                onChange={handleInputChange}
+                icon={Users}
+                min={1}
+                required
+              />
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: 'auto', paddingTop: '24px' }}>
+                <FormButton 
+                  onClick={() => setIsFormOpen(false)} 
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </FormButton>
+                <FormButton 
+                  type="submit" 
+                  variant="primary"
+                  style={{ flex: 2 }}
+                >
+                  {formMode === 'add' ? 'Register Resident' : 'Save Changes'}
+                </FormButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '90%',
+            maxWidth: '420px',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
+            padding: '30px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--accent-light)',
+              color: 'var(--accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto'
+            }}>
+              <Trash2 size={28} />
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '8px' }}>
+                Remove Resident?
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                Are you sure you want to delete <strong>{residentToDelete?.name}</strong> (Flat {residentToDelete?.flatNo})? This action is permanent and cannot be undone.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <FormButton 
+                onClick={() => { setIsDeleteOpen(false); setResidentToDelete(null); }} 
+                variant="secondary"
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </FormButton>
+              <FormButton 
+                onClick={confirmDelete} 
+                variant="danger"
+                style={{ flex: 1 }}
+              >
+                Delete Profile
+              </FormButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Animations style injector */}
+      <style>{`
+        .table-row-hover:hover {
+          background-color: var(--primary-light) !important;
+          transform: translateX(4px);
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideLeft {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+        @keyframes scaleUp {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
+    </div>
+  );
+}

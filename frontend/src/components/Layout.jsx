@@ -103,7 +103,7 @@ export default function Layout({ children }) {
           </div>
           
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* System Status Display */}
+
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 

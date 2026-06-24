@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Residents from './pages/Residents';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/residents" element={
           <ProtectedRoute>
             <Layout>
+              <Residents />
             </Layout>
           </ProtectedRoute>
         } />
