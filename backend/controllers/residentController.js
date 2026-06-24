@@ -57,7 +57,8 @@ const addResident = async (req, res) => {
       isFirstLogin: true
     });
     
-    const link = `http://localhost:5173/login?email=${generatedEmail}&otp=${generatedOtp}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const link = `${frontendUrl}/login?email=${generatedEmail}&otp=${generatedOtp}`;
     
     const mailOptions = {
       from: process.env.SMTP_MAIL,
@@ -80,7 +81,7 @@ const addResident = async (req, res) => {
 
 const updateResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, gmail, members, status, password, otp } = req.body;
+    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage } = req.body;
     const resident = await Resident.findById(req.params.id);
     
     if (!resident) {
@@ -101,6 +102,9 @@ const updateResident = async (req, res) => {
       resident.gmail = gmail || resident.gmail;
       resident.members = members !== undefined ? members : resident.members;
       resident.status = status || resident.status;
+      if (distressMessage) {
+        resident.distressMessages.push({ message: distressMessage });
+      }
     }
     
     const updatedResident = await resident.save();

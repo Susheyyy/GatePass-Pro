@@ -12,7 +12,8 @@ import {
   X, 
   Check, 
   Info,
-  Building
+  Building,
+  AlertTriangle
 } from 'lucide-react';
 import { residentApi } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
@@ -22,6 +23,9 @@ export default function Residents() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [selectedDistressResident, setSelectedDistressResident] = useState(null);
+  const [isDistressOpen, setIsDistressOpen] = useState(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState('add'); 
@@ -315,7 +319,32 @@ export default function Residents() {
                       {resident.flatNo}
                     </td>
                     <td style={{ padding: '16px', fontWeight: '600', color: 'var(--text-main)' }}>
-                      {resident.name}
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span>{resident.name}</span>
+                        {resident.distressMessages && resident.distressMessages.length > 0 && (
+                          <span 
+                            onClick={() => { setSelectedDistressResident(resident); setIsDistressOpen(true); }}
+                            title="Distress Messages Alert"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              marginLeft: '12px',
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              backgroundColor: 'var(--accent-light)',
+                              color: 'var(--accent)',
+                              fontWeight: 'bold',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer',
+                              border: '1px solid rgba(244, 63, 94, 0.2)'
+                            }}
+                          >
+                            <AlertTriangle size={10} />
+                            <span>{resident.distressMessages.length} Alert(s)</span>
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                       {resident.mobile}
@@ -585,6 +614,101 @@ export default function Residents() {
                 style={{ flex: 1 }}
               >
                 Delete Profile
+              </FormButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDistressOpen && selectedDistressResident && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '90%',
+            maxWidth: '500px',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
+            padding: '30px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={20} style={{ color: 'var(--accent)' }} />
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                  Distress Alerts: {selectedDistressResident.name}
+                </h3>
+              </div>
+              <button 
+                onClick={() => { setIsDistressOpen(false); setSelectedDistressResident(null); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: '6px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              maxHeight: '300px',
+              overflowY: 'auto',
+              padding: '8px'
+            }}>
+              {selectedDistressResident.distressMessages.map((msg, index) => (
+                <div 
+                  key={msg._id || index}
+                  style={{
+                    backgroundColor: 'rgba(244, 63, 94, 0.05)',
+                    border: '1px solid rgba(244, 63, 94, 0.15)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}
+                >
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: '500' }}>
+                    {msg.message}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                    {new Date(msg.createdAt).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <FormButton 
+                onClick={() => { setIsDistressOpen(false); setSelectedDistressResident(null); }} 
+                variant="secondary"
+              >
+                Close Desk
               </FormButton>
             </div>
           </div>

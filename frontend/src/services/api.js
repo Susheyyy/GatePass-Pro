@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api/residents';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/residents';
 
 const DEFAULT_RESIDENTS = [
   {
@@ -111,6 +111,16 @@ export const residentApi = {
           list[index].isFirstLogin = false;
           list[index].otp = '';
         } else {
+          if (residentData.distressMessage) {
+            if (!list[index].distressMessages) {
+              list[index].distressMessages = [];
+            }
+            list[index].distressMessages.push({
+              message: residentData.distressMessage,
+              createdAt: new Date().toISOString(),
+              _id: 'msg-' + Math.random().toString(36).substr(2, 9)
+            });
+          }
           list[index] = { ...list[index], ...residentData };
         }
         saveLocalResidents(list);

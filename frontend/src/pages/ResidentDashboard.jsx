@@ -9,7 +9,10 @@ import {
   Phone, 
   Mail, 
   Users,
-  AlertTriangle
+  AlertTriangle,
+  MessageSquare,
+  Send,
+  X
 } from 'lucide-react';
 import { residentApi } from '../services/api';
 import { FormButton } from '../components/FormComponents';
@@ -22,6 +25,10 @@ export default function ResidentDashboard() {
 
   const residentId = localStorage.getItem('gatepass_resident_id');
   const residentEmail = localStorage.getItem('gatepass_resident_email');
+
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [distressMessage, setDistressMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const fetchResidentDetails = async () => {
     setLoading(true);
@@ -312,25 +319,214 @@ export default function ResidentDashboard() {
           </div>
         )}
 
-        {resident.status !== 'Pending' && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            borderTop: '1px solid var(--border)',
-            paddingTop: '24px'
-          }}>
-            <FormButton 
-              onClick={() => handleUpdateStatus('Pending')} 
-              variant="secondary"
-              disabled={updating}
-            >
-              Reset to Pending
-            </FormButton>
-          </div>
-        )}
+
 
       </div>
 
+      <div style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: 9999,
+        fontFamily: 'var(--font-sans)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: '12px'
+      }}>
+        {isChatOpen && (
+          <div style={{
+            width: '350px',
+            height: '450px',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: '16px',
+            boxShadow: 'var(--shadow-premium)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            animation: 'fadeInUp 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}>
+            <div style={{
+              padding: '16px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: 'var(--primary)',
+              color: 'white'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: 'var(--accent)',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  boxShadow: '0 0 8px var(--accent)',
+                  animation: 'pulse 1.5s infinite'
+                }}></span>
+                <span style={{ fontSize: '0.9rem', fontWeight: '800' }}>
+                  Distress & Support Desk
+                </span>
+              </div>
+              <button
+                onClick={() => setIsChatOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '2px'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              backgroundColor: 'rgba(0,0,0,0.01)'
+            }}>
+              {(!resident.distressMessages || resident.distressMessages.length === 0) ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '60px 20px',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.85rem'
+                }}>
+                  💬 Need help? Send a distress message directly to the society administration desk.
+                </div>
+              ) : (
+                resident.distressMessages.map((msg, index) => (
+                  <div
+                    key={msg._id || index}
+                    style={{
+                      alignSelf: 'flex-end',
+                      maxWidth: '85%',
+                      backgroundColor: 'var(--primary-light)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '12px 12px 0 12px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                  >
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', wordBreak: 'break-word' }}>
+                      {msg.message}
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!distressMessage.trim() || sendingMessage) return;
+                setSendingMessage(true);
+                try {
+                  const updated = await residentApi.update(resident._id, {
+                    distressMessage: distressMessage.trim()
+                  });
+                  setResident(updated);
+                  setDistressMessage('');
+                } catch (err) {
+                  alert('Failed to send message. Please try again.');
+                } finally {
+                  setSendingMessage(false);
+                }
+              }}
+              style={{
+                padding: '12px',
+                borderTop: '1px solid var(--border)',
+                backgroundColor: 'var(--bg-card)',
+                display: 'flex',
+                gap: '8px'
+              }}
+            >
+              <input
+                type="text"
+                value={distressMessage}
+                onChange={(e) => setDistressMessage(e.target.value)}
+                placeholder="Type distress message..."
+                disabled={sendingMessage}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  fontFamily: 'var(--font-sans)'
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!distressMessage.trim() || sendingMessage}
+                style={{
+                  backgroundColor: 'var(--primary)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: distressMessage.trim() ? 1 : 0.6,
+                  transition: 'var(--transition)'
+                }}
+              >
+                <Send size={16} />
+              </button>
+            </form>
+          </div>
+        )}
+
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          style={{
+            backgroundColor: 'var(--accent)',
+            color: 'white',
+            border: 'none',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(244, 63, 94, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'var(--transition)'
+          }}
+        >
+          <MessageSquare size={24} />
+        </button>
+      </div>
+
+      <style>{`
+        @keyframes fadeInUp {
+          from { transform: translateY(10px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes pulse {
+          0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); }
+          70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(244, 63, 94, 0); }
+          100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+        }
+      `}</style>
     </div>
   );
 }

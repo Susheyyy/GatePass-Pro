@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config({ override: true });
 const connectDB = require('./config/db');
 const residentRoutes = require('./routes/residentRoutes');
 

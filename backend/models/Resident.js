@@ -48,7 +48,11 @@ const residentSchema = new mongoose.Schema({
   isFirstLogin: {
     type: Boolean,
     default: true
-  }
+  },
+  distressMessages: [{
+    message: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });
