@@ -28,45 +28,42 @@ export default function Login() {
     }
 
     try {
-      setTimeout(async () => {
-        if (formattedEmail === targetAdminEmail && password === targetAdminPassword) {
-          localStorage.setItem('gatepass_token', 'true');
-          localStorage.setItem('gatepass_role', 'admin');
-          localStorage.removeItem('gatepass_resident_id');
-          localStorage.removeItem('gatepass_resident_email');
-          setIsLoading(false);
-          navigate('/');
-          return;
-        }
-
-        if (password === defaultResidentPassword) {
-          try {
-            const residentsList = await residentApi.getAll();
-            const matchedResident = residentsList.find(r => {
-              const firstName = r.name.trim().split(' ')[0].toLowerCase();
-              const flatClean = r.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
-              const expectedEmail = `${firstName}.${flatClean}@gatepass.com`;
-              return formattedEmail === expectedEmail || r.email.toLowerCase() === formattedEmail;
-            });
-
-            if (matchedResident) {
-              localStorage.setItem('gatepass_token', 'true');
-              localStorage.setItem('gatepass_role', 'resident');
-              localStorage.setItem('gatepass_resident_id', matchedResident._id);
-              localStorage.setItem('gatepass_resident_email', matchedResident.email);
-              setIsLoading(false);
-              navigate('/resident-dashboard');
-              return;
-            }
-          } catch (err) {
-            console.error('Error verifying resident account:', err);
-          }
-        }
-
-        setValidationError('Access Denied. Check email or password.');
+      if (formattedEmail === targetAdminEmail && password === targetAdminPassword) {
+        localStorage.setItem('gatepass_token', 'true');
+        localStorage.setItem('gatepass_role', 'admin');
+        localStorage.removeItem('gatepass_resident_id');
+        localStorage.removeItem('gatepass_resident_email');
         setIsLoading(false);
-      }, 700);
+        navigate('/');
+        return;
+      }
 
+      if (password === defaultResidentPassword) {
+        try {
+          const residentsList = await residentApi.getAll();
+          const matchedResident = residentsList.find(r => {
+            const firstName = r.name.trim().split(' ')[0].toLowerCase();
+            const flatClean = r.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const expectedEmail = `${firstName}.${flatClean}@gatepass.com`;
+            return formattedEmail === expectedEmail || r.email.toLowerCase() === formattedEmail;
+          });
+
+          if (matchedResident) {
+            localStorage.setItem('gatepass_token', 'true');
+            localStorage.setItem('gatepass_role', 'resident');
+            localStorage.setItem('gatepass_resident_id', matchedResident._id);
+            localStorage.setItem('gatepass_resident_email', matchedResident.email);
+            setIsLoading(false);
+            navigate('/resident-dashboard');
+            return;
+          }
+        } catch (err) {
+          console.error('Error verifying resident account:', err);
+        }
+      }
+
+      setValidationError('Access Denied. Check email or password.');
+      setIsLoading(false);
     } catch (err) {
       setValidationError('An error occurred. Please try again.');
       setIsLoading(false);
@@ -80,10 +77,11 @@ export default function Login() {
       justifyContent: 'center', 
       alignItems: 'center', 
       minHeight: '100vh', 
-      backgroundColor: '#0f172a',
+      backgroundColor: 'var(--bg-main)',
       overflow: 'hidden',
       padding: '24px 12px'
     }}>
+
 
       <div className="glow-circle glow-primary"></div>
       <div className="glow-circle glow-secondary"></div>
@@ -187,7 +185,7 @@ export default function Login() {
         </form>
 
         <div style={{
-          backgroundColor: 'rgba(15, 23, 42, 0.03)',
+          backgroundColor: 'var(--bg-main)',
           border: '1px solid var(--border)',
           borderRadius: '12px',
           padding: '16px',
@@ -197,7 +195,7 @@ export default function Login() {
           fontSize: '0.8rem'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700', color: 'var(--text-main)' }}>
-            <Info size={14} className="text-primary" />
+            <Info size={14} style={{ color: 'var(--primary)' }} />
             <span>Developer Login Help:</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: 'var(--text-muted)' }}>

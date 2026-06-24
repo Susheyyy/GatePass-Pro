@@ -596,6 +596,10 @@ export default function Residents() {
           background-color: var(--primary-light) !important;
           transform: translateX(4px);
         }
+        .table-row-hover:hover td,
+        .table-row-hover:hover td * {
+          color: #0f172a !important;
+        }
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }

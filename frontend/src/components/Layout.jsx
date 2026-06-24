@@ -118,29 +118,7 @@ export default function Layout({ children }) {
           
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              padding: '8px 12px', 
-              backgroundColor: 'var(--success-light)', 
-              borderRadius: '8px',
-              color: 'var(--success)',
-              fontSize: '0.8rem',
-              fontWeight: '600'
-            }}>
-              <CheckCircle2 size={14} />
-              <span>System Online</span>
-              <span className="pulse-dot" style={{
-                width: '6px',
-                height: '6px',
-                backgroundColor: 'var(--success)',
-                borderRadius: '50%',
-                marginLeft: 'auto',
-                boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.4)',
-                animation: 'pulse 1.5s infinite'
-              }}></span>
-            </div>
+
 
             <button 
               onClick={handleLogout} 
