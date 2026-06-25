@@ -51,7 +51,6 @@ export default function Profile() {
           }
           setProfile(matched);
           setFormData({
-            bio: matched.bio || 'Resident of GatePass Pro Community.',
             location: matched.location || 'GatePass Residency',
             address: matched.address || `Flat ${matched.flatNo}, GatePass Residency`,
             mobile: matched.mobile || '',
@@ -133,23 +132,13 @@ export default function Profile() {
 
           <div>
             <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: 'var(--text-main)' }}>{profile.name}</h3>
-            <span style={{
-              display: 'inline-flex',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              backgroundColor: 'var(--primary-light)',
-              color: 'var(--primary)',
-              fontWeight: '700',
-              fontSize: '0.8rem',
-              marginTop: '6px'
-            }}>
-              {userRole === 'admin' ? 'Community Admin' : 'Resident Portal'}
-            </span>
           </div>
 
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, fontStyle: 'italic' }}>
-            "{formData.bio}"
-          </p>
+          {userRole !== 'admin' && formData.bio && (
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, fontStyle: 'italic' }}>
+              "{formData.bio}"
+            </p>
+          )}
 
           <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -197,7 +186,7 @@ export default function Profile() {
             </div>
 
             <FormInput
-              label="Bio Description"
+              label="Bio"
               value={formData.bio}
               onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
               icon={FileText}
@@ -206,7 +195,7 @@ export default function Profile() {
             />
 
             <FormInput
-              label="Community Location"
+              label="Location"
               value={formData.location}
               onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
               icon={MapPin}

@@ -146,6 +146,52 @@ export const residentApi = {
       }
       throw new Error('Resident not found in local storage');
     }
+  },
+
+  forgotPassword: async (email) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/forgot-password`, { email });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      console.warn('Backend offline, calling forgotPassword locally:', error.message);
+      const list = getLocalResidents();
+      const matched = list.find(r => r.email.toLowerCase() === email.trim().toLowerCase() || r.gmail.toLowerCase() === email.trim().toLowerCase());
+      if (matched) {
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        matched.otp = generatedOtp;
+        saveLocalResidents(list);
+        return { message: 'Verification OTP sent to your registered Gmail address', otp: generatedOtp };
+      }
+      throw new Error('Resident not found with this email');
+    }
+  },
+
+  resetForgotPassword: async (email, otp, password) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/reset-password`, { email, otp, password });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      console.warn('Backend offline, resetting password locally:', error.message);
+      const list = getLocalResidents();
+      const matched = list.find(r => r.email.toLowerCase() === email.trim().toLowerCase() || r.gmail.toLowerCase() === email.trim().toLowerCase());
+      if (matched) {
+        if (matched.otp !== otp.trim()) {
+          throw new Error('Invalid verification OTP');
+        }
+        matched.password = password;
+        matched.isFirstLogin = false;
+        matched.otp = '';
+        saveLocalResidents(list);
+        return matched;
+      }
+      throw new Error('Resident not found');
+    }
   }
 };
 
