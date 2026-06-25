@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, LogIn, ShieldCheck, Info, KeyRound, Eye, EyeOff, Shield } from 'lucide-react';
+import { Mail, Lock, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { residentApi } from '../services/api';
 
 export default function Login() {
@@ -16,6 +16,10 @@ export default function Login() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [enteredOtp, setEnteredOtp] = useState('');
+
+  const [isForgotView, setIsForgotView] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [isForgotResetView, setIsForgotResetView] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -136,6 +140,52 @@ export default function Login() {
     }
   };
 
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setValidationError('');
+    try {
+      await residentApi.forgotPassword(forgotEmail);
+      setIsForgotView(false);
+      setIsForgotResetView(true);
+      setIsLoading(false);
+    } catch (err) {
+      setValidationError(err.message || 'Failed to send OTP. Please check your email.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotResetSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setValidationError('');
+
+    if (newPassword !== confirmPassword) {
+      setValidationError('Passwords do not match');
+      setIsLoading(false);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setValidationError('Password must be at least 6 characters long');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const resident = await residentApi.resetForgotPassword(forgotEmail, enteredOtp, newPassword);
+      localStorage.setItem('gatepass_token', 'true');
+      localStorage.setItem('gatepass_role', 'resident');
+      localStorage.setItem('gatepass_resident_id', resident._id);
+      localStorage.setItem('gatepass_resident_email', resident.email);
+      setIsLoading(false);
+      navigate('/resident-dashboard');
+    } catch (err) {
+      setValidationError(err.message || 'Failed to reset password. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div style={{ 
       position: 'relative', 
@@ -188,24 +238,13 @@ export default function Login() {
       }}>
         
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
-            color: 'white',
-            width: '52px',
-            height: '52px',
-            borderRadius: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 8px 16px rgba(50, 11, 53, 0.2)'
-          }}>
-          </div>
+   
           <div>
             <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.03em' }}>
-              {isResetView ? 'Configure Account' : 'GatePass Pro'}
+              {isResetView ? 'Configure Account' : isForgotView ? 'Forgot Password' : isForgotResetView ? 'Reset Password' : 'GatePass Pro'}
             </h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
-              {isResetView ? 'Choose a secure password for your profile.' : 'Society Gate Control & Administrative Center'}
+              {isResetView ? 'Choose a secure password for your profile.' : isForgotView ? 'Enter your email to request a reset OTP.' : isForgotResetView ? 'Verify your OTP and choose a new password.' : ''}
             </p>
           </div>
         </div>
@@ -225,7 +264,208 @@ export default function Login() {
           </div>
         )}
 
-        {!isResetView ? (
+        {isForgotView ? (
+          <form onSubmit={handleForgotSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Email Address
+              </label>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => { setForgotEmail(e.target.value); setValidationError(''); }}
+                  placeholder="name@gatepass.com"
+                  required
+                  disabled={isLoading}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px 12px 42px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    fontFamily: 'var(--font-sans)',
+                    backgroundColor: 'white',
+                    transition: 'var(--transition)'
+                  }}
+                  className="login-input"
+                />
+                <Mail size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-light)' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setIsForgotView(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: 'white',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border)',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'var(--transition)'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                style={{
+                  flex: 2,
+                  backgroundColor: 'var(--primary)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'var(--transition)'
+                }}
+              >
+                {isLoading ? <span className="spinner"></span> : <span>Send OTP Code</span>}
+              </button>
+            </div>
+          </form>
+        ) : isForgotResetView ? (
+          <form onSubmit={handleForgotResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={forgotEmail}
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.9rem',
+                  backgroundColor: 'rgba(0,0,0,0.02)',
+                  color: 'var(--text-muted)'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Enter OTP Code
+              </label>
+              <input
+                type="text"
+                value={enteredOtp}
+                onChange={(e) => { setEnteredOtp(e.target.value); setValidationError(''); }}
+                placeholder="6-digit verification code"
+                required
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.9rem',
+                  backgroundColor: 'white'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                New Password
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => { setNewPassword(e.target.value); setValidationError(''); }}
+                placeholder="••••••••"
+                required
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.9rem',
+                  backgroundColor: 'white'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => { setConfirmPassword(e.target.value); setValidationError(''); }}
+                placeholder="••••••••"
+                required
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.9rem',
+                  backgroundColor: 'white'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setIsForgotResetView(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: 'white',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border)',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'var(--transition)'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                style={{
+                  flex: 2,
+                  backgroundColor: 'var(--primary)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'var(--transition)'
+                }}
+              >
+                {isLoading ? <span className="spinner"></span> : <span>Reset & Sign In</span>}
+              </button>
+            </div>
+          </form>
+        ) : !isResetView ? (
           <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -302,6 +542,28 @@ export default function Login() {
               </div>
             </div>
 
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-12px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsForgotView(true);
+                  setForgotEmail(email);
+                  setValidationError('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--primary)',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                Forgot Password?
+              </button>
+            </div>
+
             <button
               type="submit"
               disabled={isLoading}
@@ -327,7 +589,6 @@ export default function Login() {
                 <span className="spinner"></span>
               ) : (
                 <>
-                  <LogIn size={18} />
                   <span>Sign In</span>
                 </>
               )}
@@ -501,24 +762,7 @@ export default function Login() {
           </form>
         )}
 
-        <div style={{
-          backgroundColor: 'rgba(50, 11, 53, 0.02)',
-          border: '1px solid var(--border)',
-          borderRadius: '16px',
-          padding: '16px',
-          fontSize: '0.8rem',
-          color: 'var(--text-muted)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '6px' }}>
-            <Info size={14} style={{ color: 'var(--primary)' }} />
-            <span>Developer Login Help:</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div><strong>Admin:</strong> admin@gatepass.com / <code style={{ color: 'var(--primary)', fontWeight: 'bold' }}>admin123</code></div>
-            <div><strong>Security:</strong> security@gatepass.com / <code style={{ color: 'var(--primary)', fontWeight: 'bold' }}>security123</code></div>
-            <div><strong>Resident:</strong> firstname.flatnumber@gatepass.com / <code style={{ color: 'var(--primary)', fontWeight: 'bold' }}>resident123</code></div>
-          </div>
-        </div>
+
       </div>
 
       <style>{`

@@ -144,7 +144,6 @@ export default function Layout({ children }) {
         </main>
       </div>
 
-
       <style>{`
         @keyframes pulse {
           0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }

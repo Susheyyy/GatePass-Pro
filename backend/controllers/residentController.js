@@ -38,6 +38,16 @@ const addResident = async (req, res) => {
     if (!flatNo || !name || !mobile || !gmail || !members) {
       return res.status(400).json({ message: 'All fields are required' });
     }
+
+    const existingGmail = await Resident.findOne({ gmail: gmail.toLowerCase() });
+    if (existingGmail) {
+      return res.status(400).json({ message: 'A resident with this Gmail address already exists' });
+    }
+
+    const existingFlat = await Resident.findOne({ flatNo });
+    if (existingFlat) {
+      return res.status(400).json({ message: 'A resident is already registered for this flat' });
+    }
     
     const firstName = name.trim().split(' ')[0].toLowerCase();
     const flatClean = flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -170,10 +180,83 @@ const resendOtp = async (req, res) => {
   }
 };
 
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email address is required' });
+    }
+    const formattedEmail = email.trim().toLowerCase();
+    const resident = await Resident.findOne({
+      $or: [
+        { email: formattedEmail },
+        { gmail: formattedEmail }
+      ]
+    });
+    if (!resident) {
+      return res.status(404).json({ message: 'Resident not found with this email' });
+    }
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    resident.otp = generatedOtp;
+    await resident.save();
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const link = `${frontendUrl}/login?email=${resident.email}&otp=${generatedOtp}`;
+
+    const mailOptions = {
+      from: process.env.SMTP_MAIL,
+      to: resident.gmail,
+      subject: 'GatePass Pro - Password Reset OTP',
+      text: `Hello ${resident.name},\n\nWe received a request to reset your password.\n\nUsername: ${resident.email}\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to verify and choose a new password:\n${link}`
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (mailError) {
+      console.error(mailError);
+    }
+
+    res.status(200).json({ message: 'Verification OTP sent to your registered Gmail address' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const resetForgotPassword = async (req, res) => {
+  try {
+    const { email, otp, password } = req.body;
+    if (!email || !otp || !password) {
+      return res.status(400).json({ message: 'All fields (email, otp, new password) are required' });
+    }
+    const formattedEmail = email.trim().toLowerCase();
+    const resident = await Resident.findOne({
+      $or: [
+        { email: formattedEmail },
+        { gmail: formattedEmail }
+      ]
+    });
+    if (!resident) {
+      return res.status(404).json({ message: 'Resident not found' });
+    }
+    if (resident.otp !== otp.trim()) {
+      return res.status(400).json({ message: 'Invalid verification OTP' });
+    }
+    resident.password = password;
+    resident.isFirstLogin = false;
+    resident.otp = '';
+    await resident.save();
+    res.status(200).json(resident);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getResidents,
   addResident,
   updateResident,
   deleteResident,
-  resendOtp
+  resendOtp,
+  forgotPassword,
+  resetForgotPassword
 };

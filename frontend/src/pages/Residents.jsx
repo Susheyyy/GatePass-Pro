@@ -469,22 +469,23 @@ export default function Residents() {
           backgroundColor: 'rgba(15, 23, 42, 0.4)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
-          justifyContent: 'flex-end',
+          justifyContent: 'center',
+          alignItems: 'center',
           zIndex: 1000,
           animation: 'fadeIn 0.2s ease-out'
         }}>
           <div style={{
-            width: '100%',
-            maxWidth: '460px',
+            width: '90%',
+            maxWidth: '540px',
             backgroundColor: 'var(--bg-card)',
-            height: '100%',
-            boxShadow: '-10px 0 30px rgba(15, 23, 42, 0.1)',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
             padding: '36px',
             display: 'flex',
             flexDirection: 'column',
             gap: '24px',
-            animation: 'slideLeft 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-            overflowY: 'auto'
+            animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            maxHeight: '90vh'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>
@@ -511,11 +512,11 @@ export default function Residents() {
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
               <FormInput
                 label="Flat Number"
                 name="flatNo"
-                placeholder="e.g. A-101"
+                placeholder="Enter flat number"
                 value={formData.flatNo}
                 onChange={handleInputChange}
                 icon={Home}
@@ -525,7 +526,7 @@ export default function Residents() {
               <FormInput
                 label="Resident Full Name"
                 name="name"
-                placeholder="e.g. Rajesh Kumar"
+                placeholder="Enter full name"
                 value={formData.name}
                 onChange={handleInputChange}
                 icon={User}
@@ -535,7 +536,7 @@ export default function Residents() {
               <FormInput
                 label="Mobile Number"
                 name="mobile"
-                placeholder="e.g. 9876543210"
+                placeholder="Enter mobile number"
                 value={formData.mobile}
                 onChange={handleInputChange}
                 icon={Phone}
@@ -546,7 +547,7 @@ export default function Residents() {
                 label="Gmail Address"
                 name="gmail"
                 type="email"
-                placeholder="e.g. rajesh@gmail.com"
+                placeholder="Enter gmail address"
                 value={formData.gmail}
                 onChange={handleInputChange}
                 icon={Mail}
@@ -557,7 +558,7 @@ export default function Residents() {
                 label="Total Family Members"
                 name="members"
                 type="number"
-                placeholder="Number of members"
+                placeholder="Enter number of members"
                 value={formData.members}
                 onChange={handleInputChange}
                 icon={Users}
