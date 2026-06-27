@@ -822,11 +822,31 @@ export default function Residents() {
             animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertTriangle size={20} style={{ color: 'var(--accent)' }} />
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)' }}>
-                  Distress Alerts: {selectedDistressResident.name}
-                </h3>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                    Distress Alerts: {selectedDistressResident.name}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Alert Status:</span>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      backgroundColor: 
+                        (selectedDistressResident.distressStatus === 'Active' || !selectedDistressResident.distressStatus || selectedDistressResident.distressStatus === 'None') ? 'var(--accent-light)' :
+                        selectedDistressResident.distressStatus === 'Resolved' ? 'var(--success-light)' :
+                        selectedDistressResident.distressStatus === 'Dismissed' ? 'rgba(100, 116, 139, 0.1)' : 'var(--accent-light)',
+                      color:
+                        (selectedDistressResident.distressStatus === 'Active' || !selectedDistressResident.distressStatus || selectedDistressResident.distressStatus === 'None') ? 'var(--accent)' :
+                        selectedDistressResident.distressStatus === 'Resolved' ? 'var(--success)' :
+                        selectedDistressResident.distressStatus === 'Dismissed' ? 'rgb(100, 116, 139)' : 'var(--accent)',
+                    }}>
+                      {(selectedDistressResident.distressStatus === 'None' || !selectedDistressResident.distressStatus) ? 'Active' : selectedDistressResident.distressStatus}
+                    </span>
+                  </div>
+                </div>
               </div>
               <button 
                 onClick={() => { setIsDistressOpen(false); setSelectedDistressResident(null); }}
@@ -931,28 +951,37 @@ export default function Residents() {
               </FormButton>
             </form>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
               <FormButton
                 onClick={async () => {
                   try {
-                    const updated = await residentApi.update(selectedDistressResident._id, { clearDistress: true });
+                    const updated = await residentApi.update(selectedDistressResident._id, { distressStatus: 'Resolved' });
                     setResidents(prev => prev.map(r => r._id === selectedDistressResident._id ? updated : r));
-                    setIsDistressOpen(false);
-                    setSelectedDistressResident(null);
-                    toast.success('Distress alerts resolved successfully!');
+                    setSelectedDistressResident(updated);
+                    toast.success('Distress alert status set to Resolved.');
                   } catch (err) {
-                    toast.error('Failed to resolve distress alerts.');
+                    toast.error('Failed to resolve alert.');
                   }
                 }}
                 variant="success"
               >
-                Mark as Resolved
+                Resolve
               </FormButton>
+              
               <FormButton
-                onClick={() => { setIsDistressOpen(false); setSelectedDistressResident(null); }}
+                onClick={async () => {
+                  try {
+                    const updated = await residentApi.update(selectedDistressResident._id, { distressStatus: 'Dismissed' });
+                    setResidents(prev => prev.map(r => r._id === selectedDistressResident._id ? updated : r));
+                    setSelectedDistressResident(updated);
+                    toast.success('Distress alert status set to Dismissed.');
+                  } catch (err) {
+                    toast.error('Failed to dismiss alert.');
+                  }
+                }}
                 variant="secondary"
               >
-                Close Desk
+                Dismiss
               </FormButton>
             </div>
           </div>

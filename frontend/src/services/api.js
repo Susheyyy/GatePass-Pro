@@ -82,7 +82,14 @@ export const residentApi = {
         }
         const firstName = r.name.trim().split(' ')[0].toLowerCase();
         const flatClean = r.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+        let generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+        let emailExists = list.find(res => res.email.toLowerCase() === generatedEmail.toLowerCase());
+        let counter = 1;
+        while (emailExists) {
+          generatedEmail = `${firstName}.${flatClean}${counter}@gatepass.com`;
+          emailExists = list.find(res => res.email.toLowerCase() === generatedEmail.toLowerCase());
+          counter++;
+        }
         const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
         const newRes = {
           ...r,
@@ -145,19 +152,28 @@ export const residentApi = {
       if (existingGmail) {
         throw new Error('A resident with this Gmail address already exists');
       }
-      const existingFlat = list.find(r => r.flatNo.toLowerCase() === residentData.flatNo.trim().toLowerCase());
-      if (existingFlat) {
-        throw new Error('A resident is already registered for this flat');
+      if (!residentData.isSelfRegistration && !residentData.isResidentAdding) {
+        const existingFlat = list.find(r => r.flatNo.toLowerCase() === residentData.flatNo.trim().toLowerCase());
+        if (existingFlat) {
+          throw new Error('A resident is already registered for this flat. Additional residents must register themselves or be added by the flat owner.');
+        }
       }
       const firstName = residentData.name.trim().split(' ')[0].toLowerCase();
       const flatClean = residentData.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+      let generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+      let emailExists = list.find(r => r.email.toLowerCase() === generatedEmail.toLowerCase());
+      let counter = 1;
+      while (emailExists) {
+        generatedEmail = `${firstName}.${flatClean}${counter}@gatepass.com`;
+        emailExists = list.find(r => r.email.toLowerCase() === generatedEmail.toLowerCase());
+        counter++;
+      }
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
       const newResident = {
         ...residentData,
         email: generatedEmail,
-        status: 'Pending',
+        status: residentData.isResidentAdding ? 'Approved' : 'Pending',
         otp: generatedOtp,
         password: 'resident123',
         isFirstLogin: true,
@@ -210,6 +226,21 @@ export const residentApi = {
           list[index].isFirstLogin = false;
           list[index].otp = '';
         } else {
+          if (residentData.distressStatus) {
+            list[index].distressStatus = residentData.distressStatus;
+            if (residentData.distressStatus === 'Resolved' || residentData.distressStatus === 'Dismissed') {
+              addLocalNotification({
+                recipient: list[index].flatNo,
+                title: `Distress Alert ${residentData.distressStatus}`,
+                message: `Your distress alert has been marked as ${residentData.distressStatus.toLowerCase()} by the administrator.`,
+                type: 'distress_reply'
+              });
+            }
+          }
+          if (residentData.clearDistress) {
+            list[index].distressMessages = [];
+            list[index].distressStatus = 'None';
+          }
           if (residentData.distressMessage) {
             if (!list[index].distressMessages) {
               list[index].distressMessages = [];
@@ -221,6 +252,9 @@ export const residentApi = {
               createdAt: new Date().toISOString(),
               _id: 'msg-' + Math.random().toString(36).substr(2, 9)
             });
+            if (msgSender !== 'admin') {
+              list[index].distressStatus = 'Active';
+            }
             addLocalNotification({
               recipient: msgSender === 'admin' ? list[index].flatNo : 'admin',
               title: msgSender === 'admin' ? 'New Distress Response' : 'Distress Alert Received',
@@ -346,7 +380,13 @@ export const visitorApi = {
       }
       if (params.search) {
         const searchRegex = new RegExp(params.search, 'i');
-        list = list.filter(v => searchRegex.test(v.name) || searchRegex.test(v.type) || (v.passcode && searchRegex.test(v.passcode)));
+        list = list.filter(v => 
+          searchRegex.test(v.name) || 
+          searchRegex.test(v.type) || 
+          (v.purpose && searchRegex.test(v.purpose)) || 
+          (v.vehicleNumber && searchRegex.test(v.vehicleNumber)) || 
+          (v.passcode && searchRegex.test(v.passcode))
+        );
       }
       return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
@@ -361,7 +401,7 @@ export const visitorApi = {
       const newVisitor = {
         ...visitorData,
         passcode: Math.floor(100000 + Math.random() * 900000).toString(),
-        status: visitorData.status || 'Approved',
+        status: visitorData.status || 'Pending',
         _id: 'mock-visitor-' + Math.random().toString(36).substr(2, 9),
         createdAt: new Date().toISOString()
       };

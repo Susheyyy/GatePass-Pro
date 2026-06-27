@@ -33,7 +33,7 @@ const getResidents = async (req, res) => {
 
 const addResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, gmail, members } = req.body;
+    const { flatNo, name, mobile, gmail, members, isSelfRegistration, isResidentAdding } = req.body;
     
     if (!flatNo || !name || !mobile || !gmail || !members) {
       return res.status(400).json({ message: 'All fields are required' });
@@ -58,14 +58,23 @@ const addResident = async (req, res) => {
       return res.status(400).json({ message: 'A resident with this Gmail address already exists' });
     }
 
-    const existingFlat = await Resident.findOne({ flatNo });
-    if (existingFlat) {
-      return res.status(400).json({ message: 'A resident is already registered for this flat' });
+    if (!isSelfRegistration && !isResidentAdding) {
+      const existingFlat = await Resident.findOne({ flatNo });
+      if (existingFlat) {
+        return res.status(400).json({ message: 'A resident is already registered for this flat. Additional residents must register themselves or be added by the flat owner.' });
+      }
     }
     
     const firstName = name.trim().split(' ')[0].toLowerCase();
     const flatClean = flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+    let generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+    let emailExists = await Resident.findOne({ email: generatedEmail });
+    let counter = 1;
+    while (emailExists) {
+      generatedEmail = `${firstName}.${flatClean}${counter}@gatepass.com`;
+      emailExists = await Resident.findOne({ email: generatedEmail });
+      counter++;
+    }
     
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     const generatedCommunityId = Math.floor(10000 + Math.random() * 90000).toString();
@@ -81,7 +90,7 @@ const addResident = async (req, res) => {
       password: 'resident123',
       isFirstLogin: true,
       communityId: generatedCommunityId,
-      status: 'Pending',
+      status: isResidentAdding ? 'Approved' : 'Pending',
       address: `Flat ${flatNo}, GatePass Residency`
     });
 
@@ -120,7 +129,7 @@ const addResident = async (req, res) => {
 
 const updateResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage, sender, bio, location, address, clearDistress, currentPassword, newPassword } = req.body;
+    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage, sender, bio, location, address, clearDistress, currentPassword, newPassword, distressStatus } = req.body;
     const resident = await Resident.findById(req.params.id);
     
     if (!resident) {
@@ -191,15 +200,34 @@ const updateResident = async (req, res) => {
       resident.bio = bio !== undefined ? bio : resident.bio;
       resident.location = location !== undefined ? location : resident.location;
       resident.address = address !== undefined ? address : resident.address;
+      if (distressStatus && distressStatus !== resident.distressStatus) {
+        resident.distressStatus = distressStatus;
+        if (distressStatus === 'Resolved' || distressStatus === 'Dismissed') {
+          try {
+            const Notification = require('../models/Notification');
+            await Notification.create({
+              recipient: resident.flatNo,
+              title: `Distress Alert ${distressStatus}`,
+              message: `Your distress alert has been marked as ${distressStatus.toLowerCase()} by the administrator.`,
+              type: 'distress_reply'
+            });
+          } catch (notifErr) {}
+        }
+      }
       if (clearDistress) {
         resident.distressMessages = [];
+        resident.distressStatus = 'None';
       }
       if (distressMessage) {
         const msgSender = sender || 'resident';
         resident.distressMessages.push({
           message: distressMessage,
           sender: msgSender
-        });        try {
+        });
+        if (msgSender !== 'admin') {
+          resident.distressStatus = 'Active';
+        }
+        try {
           const Notification = require('../models/Notification');
           if (msgSender === 'admin') {
             await Notification.create({
@@ -442,7 +470,15 @@ const bulkCreateResidents = async (req, res) => {
 
       const firstName = name.toString().trim().split(' ')[0].toLowerCase();
       const flatClean = flatNo.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
-      const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+      let generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+      let emailExists = await Resident.findOne({ email: generatedEmail });
+      let counter = 1;
+      while (emailExists) {
+        generatedEmail = `${firstName}.${flatClean}${counter}@gatepass.com`;
+        emailExists = await Resident.findOne({ email: generatedEmail });
+        counter++;
+      }
+      
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       const generatedCommunityId = Math.floor(10000 + Math.random() * 90000).toString();
 

@@ -56,7 +56,8 @@ export default function Register() {
     try {
       await residentApi.create({
         ...formData,
-        members: parseInt(formData.members) || 1
+        members: parseInt(formData.members) || 1,
+        isSelfRegistration: true
       });
       setIsSuccess(true);
     } catch (err) {

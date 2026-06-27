@@ -30,7 +30,9 @@ export default function Visitors() {
     type: 'Guest',
     mobile: '',
     flatNo: '',
-    status: 'Approved'
+    purpose: '',
+    vehicleNumber: '',
+    status: 'Pending'
   });
   const [selectedVisitor, setSelectedVisitor] = useState(null);
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
@@ -72,7 +74,9 @@ export default function Visitors() {
         type: 'Guest',
         mobile: '',
         flatNo: '',
-        status: 'Approved'
+        purpose: '',
+        vehicleNumber: '',
+        status: 'Pending'
       });
       fetchVisitors(searchQuery);
       toast.success('Visitor registered successfully!');
@@ -149,7 +153,8 @@ export default function Visitors() {
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)' }}>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Visitor Info</th>
-                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Type</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Type / Purpose</th>
+                  <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vehicle Number</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Destination</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Passcode</th>
                   <th style={{ padding: '14px 16px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Status</th>
@@ -174,7 +179,13 @@ export default function Visitors() {
                       <div>{visitor.name}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{visitor.mobile || 'No Mobile'}</div>
                     </td>
-                    <td style={{ padding: '16px', fontWeight: '600', color: 'var(--primary)' }}>{visitor.type}</td>
+                    <td style={{ padding: '16px', color: 'var(--text-main)', fontSize: '0.9rem' }}>
+                      <div style={{ fontWeight: '600', color: 'var(--primary)' }}>{visitor.type}</div>
+                      {visitor.purpose && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{visitor.purpose}</div>}
+                    </td>
+                    <td style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '600' }}>
+                      {visitor.vehicleNumber || 'N/A'}
+                    </td>
                     <td style={{ padding: '16px', color: 'var(--text-main)', fontSize: '0.9rem' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <MapPin size={14} style={{ color: 'var(--text-muted)' }} />
@@ -194,10 +205,14 @@ export default function Visitors() {
                         backgroundColor: 
                           visitor.status === 'Checked In' ? 'var(--success-light)' : 
                           visitor.status === 'Checked Out' ? 'var(--border)' : 
+                          visitor.status === 'Approved' ? 'var(--primary-light)' : 
+                          visitor.status === 'Rejected' ? 'var(--accent-light)' : 
                           'var(--warning-light)',
                         color: 
                           visitor.status === 'Checked In' ? 'var(--success)' : 
                           visitor.status === 'Checked Out' ? 'var(--text-muted)' : 
+                          visitor.status === 'Approved' ? 'var(--primary)' : 
+                          visitor.status === 'Rejected' ? 'var(--accent)' : 
                           'var(--warning)'
                       }}>
                         {visitor.status}
@@ -205,6 +220,24 @@ export default function Visitors() {
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        {visitor.status === 'Pending' && (
+                          <>
+                            <button
+                              onClick={() => handleStatusUpdate(visitor._id, 'Approved')}
+                              title="Approve Visitor"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--success)', padding: '6px' }}
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleStatusUpdate(visitor._id, 'Rejected')}
+                              title="Reject Visitor"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', padding: '6px' }}
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        )}
                         {visitor.status === 'Approved' && (
                           <button
                             onClick={() => handleStatusUpdate(visitor._id, 'Checked In')}
@@ -328,6 +361,25 @@ export default function Visitors() {
                 required
               />
 
+              <FormInput
+                label="Purpose of Visit"
+                name="purpose"
+                placeholder="e.g. Meeting, Delivery, Maintenance"
+                value={formData.purpose}
+                onChange={handleInputChange}
+                icon={ShieldAlert}
+                required
+              />
+
+              <FormInput
+                label="Vehicle Number"
+                name="vehicleNumber"
+                placeholder="e.g. MH04AB1234"
+                value={formData.vehicleNumber}
+                onChange={handleInputChange}
+                icon={MapPin}
+              />
+
               <div style={{ display: 'flex', gap: '12px', marginTop: 'auto', paddingTop: '24px' }}>
                 <FormButton onClick={() => setIsAddOpen(false)} variant="secondary" style={{ flex: 1 }}>
                   Cancel
@@ -388,6 +440,14 @@ export default function Visitors() {
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Mobile</span>
                 <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedVisitor.mobile || 'No Mobile'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Purpose</span>
+                <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedVisitor.purpose || 'N/A'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Vehicle Number</span>
+                <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>{selectedVisitor.vehicleNumber || 'N/A'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Visitor Type</span>

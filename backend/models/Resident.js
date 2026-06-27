@@ -54,6 +54,11 @@ const residentSchema = new mongoose.Schema({
     sender: { type: String, default: 'resident' },
     createdAt: { type: Date, default: Date.now }
   }],
+  distressStatus: {
+    type: String,
+    enum: ['Active', 'Resolved', 'Dismissed', 'None'],
+    default: 'None'
+  },
   communityId: {
     type: String,
     unique: true

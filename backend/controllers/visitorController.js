@@ -12,6 +12,8 @@ const getVisitors = async (req, res) => {
       query.$or = [
         { name: searchRegex },
         { type: searchRegex },
+        { purpose: searchRegex },
+        { vehicleNumber: searchRegex },
         { passcode: searchRegex }
       ];
     }
@@ -24,7 +26,7 @@ const getVisitors = async (req, res) => {
 
 const addVisitor = async (req, res) => {
   try {
-    const { name, type, mobile, flatNo, status } = req.body;
+    const { name, type, mobile, flatNo, status, purpose, vehicleNumber } = req.body;
     if (!name || !type || !flatNo) {
       return res.status(400).json({ message: 'Name, type, and flat number are required' });
     }
@@ -35,7 +37,9 @@ const addVisitor = async (req, res) => {
       mobile,
       flatNo,
       passcode: generatedPasscode,
-      status: status || 'Approved'
+      status: status || 'Pending',
+      purpose,
+      vehicleNumber
     });
     res.status(201).json(visitor);
   } catch (error) {

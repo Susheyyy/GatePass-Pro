@@ -25,6 +25,13 @@ export default function ResidentDashboard() {
   const toast = useToast();
   const [resident, setResident] = useState(null);
   const [visitors, setVisitors] = useState([]);
+  const [flatMembers, setFlatMembers] = useState([]);
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+  const [memberForm, setMemberForm] = useState({
+    name: '',
+    mobile: '',
+    gmail: ''
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
@@ -49,6 +56,8 @@ export default function ResidentDashboard() {
       const matched = list.find(r => r._id === residentId || r.email.toLowerCase() === residentEmail?.toLowerCase());
       if (matched) {
         setResident(matched);
+        const membersList = list.filter(r => r.flatNo.toLowerCase() === matched.flatNo.toLowerCase());
+        setFlatMembers(membersList);
         if (matched.status === 'Approved') {
           const visitorList = await visitorApi.getAll({ flatNo: matched.flatNo });
           setVisitors(visitorList);
@@ -101,6 +110,32 @@ export default function ResidentDashboard() {
       toast.success('Pre-approved pass created successfully!');
     } catch (err) {
       toast.error('Failed to create pre-approved pass.');
+    }
+  };
+
+  const handleMemberSubmit = async (e) => {
+    e.preventDefault();
+    if (!/^\d+$/.test(memberForm.mobile.trim())) {
+      toast.warning('Mobile Number must contain only digits');
+      return;
+    }
+    if (!/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(memberForm.gmail.trim())) {
+      toast.warning('Gmail Address must end with a standard provider');
+      return;
+    }
+    try {
+      await residentApi.create({
+        ...memberForm,
+        flatNo: resident.flatNo,
+        members: 1,
+        isResidentAdding: true
+      });
+      setIsMemberModalOpen(false);
+      setMemberForm({ name: '', mobile: '', gmail: '' });
+      toast.success('Co-resident added successfully!');
+      fetchResidentDetails();
+    } catch (err) {
+      toast.error(err.message || 'Failed to add co-resident.');
     }
   };
 
@@ -337,10 +372,16 @@ export default function ResidentDashboard() {
           </p>
         </div>
         
-        <FormButton onClick={() => setIsPassModalOpen(true)} variant="primary">
-          <Plus size={18} />
-          <span>Pre-Approve Visitor</span>
-        </FormButton>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <FormButton onClick={() => setIsMemberModalOpen(true)} variant="secondary">
+            <Users size={18} />
+            <span>Add Co-Resident</span>
+          </FormButton>
+          <FormButton onClick={() => setIsPassModalOpen(true)} variant="primary">
+            <Plus size={18} />
+            <span>Pre-Approve Visitor</span>
+          </FormButton>
+        </div>
       </div>
 
       <div style={{ 
@@ -392,6 +433,68 @@ export default function ResidentDashboard() {
             <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-main)' }}>{visitors.length}</div>
           </div>
         </div>
+      </div>
+
+      <div className="content-card">
+        <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Users size={20} style={{ color: 'var(--primary)' }} />
+          <span>Flat Members / Co-Residents ({flatMembers.length})</span>
+        </h3>
+        {flatMembers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-light)' }}>
+            No registered members found for this flat.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+            {flatMembers.map((member) => (
+              <div 
+                key={member._id} 
+                style={{ 
+                  padding: '16px', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '12px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px', 
+                  backgroundColor: 'var(--bg-card)' 
+                }}
+              >
+                <div style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  borderRadius: '50%', 
+                  backgroundColor: 'var(--primary-light)', 
+                  color: 'var(--primary)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontWeight: '700', 
+                  fontSize: '1.1rem' 
+                }}>
+                  {member.name[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {member.name} {member._id === residentId && '(You)'}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.gmail}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{member.mobile}</span>
+                </div>
+                <span style={{ 
+                  fontSize: '0.75rem', 
+                  fontWeight: '700', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px', 
+                  backgroundColor: member.status === 'Approved' ? 'var(--success-light)' : 'var(--warning-light)', 
+                  color: member.status === 'Approved' ? 'var(--success)' : 'var(--warning)',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {member.status || 'Pending'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="content-card">
@@ -542,6 +645,78 @@ export default function ResidentDashboard() {
         </div>
       )}
 
+      {isMemberModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          zIndex: 1000
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '460px',
+            backgroundColor: 'var(--bg-card)',
+            height: '100%',
+            padding: '36px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>Add Co-Resident</h3>
+              <button onClick={() => setIsMemberModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleMemberSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+              <FormInput
+                label="Full Name"
+                value={memberForm.name}
+                onChange={(e) => setMemberForm(prev => ({ ...prev, name: e.target.value }))}
+                icon={User}
+                placeholder="e.g. Jane Doe"
+                required
+              />
+
+              <FormInput
+                label="Mobile Number"
+                value={memberForm.mobile}
+                onChange={(e) => setMemberForm(prev => ({ ...prev, mobile: e.target.value }))}
+                icon={Phone}
+                placeholder="e.g. 9876543210"
+                required
+              />
+
+              <FormInput
+                label="Gmail Address"
+                value={memberForm.gmail}
+                onChange={(e) => setMemberForm(prev => ({ ...prev, gmail: e.target.value }))}
+                icon={Mail}
+                placeholder="e.g. jane.doe@gmail.com"
+                required
+              />
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: 'auto', paddingTop: '24px' }}>
+                <FormButton onClick={() => setIsMemberModalOpen(false)} variant="secondary" style={{ flex: 1 }}>
+                  Cancel
+                </FormButton>
+                <FormButton type="submit" variant="primary" style={{ flex: 2 }}>
+                  Add Member
+                </FormButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div style={{
         position: 'fixed',
         bottom: '24px',
@@ -588,6 +763,23 @@ export default function ResidentDashboard() {
                 <span style={{ fontSize: '0.9rem', fontWeight: '800' }}>
                   Distress & Support Desk
                 </span>
+                {resident.distressStatus && resident.distressStatus !== 'None' && (
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: '700',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    marginLeft: '8px',
+                    backgroundColor: 
+                      resident.distressStatus === 'Active' ? 'var(--accent)' :
+                      resident.distressStatus === 'Resolved' ? 'var(--success)' :
+                      'rgba(255,255,255,0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(255,255,255,0.3)'
+                  }}>
+                    {resident.distressStatus}
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => setIsChatOpen(false)}

@@ -187,7 +187,6 @@ export default function Profile() {
           gap: '40px'
         }}>
           
-          {/* Top Identity Block */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -240,7 +239,6 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Profile Details (Section 1) */}
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
               <User size={18} style={{ color: 'var(--primary)' }} />
@@ -310,7 +308,6 @@ export default function Profile() {
 
           <div style={{ height: '1px', backgroundColor: 'var(--border)' }}></div>
 
-          {/* Security & Password Controls (Section 2) */}
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
               <KeyRound size={18} style={{ color: 'var(--primary)' }} />
@@ -346,7 +343,7 @@ export default function Profile() {
                         fontWeight: '700',
                         fontSize: '0.85rem',
                         cursor: 'pointer',
-                        marginBottom: '2px',
+                        marginBottom: '20px',
                         transition: 'var(--transition)'
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-light)'}
@@ -381,7 +378,7 @@ export default function Profile() {
                       fontWeight: '700',
                       fontSize: '0.85rem',
                       cursor: 'pointer',
-                      marginBottom: '2px'
+                      marginBottom: '20px'
                     }}
                   >
                     Use Current Password

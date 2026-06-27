@@ -378,7 +378,6 @@ body {
   }
 }
 
-/* Responsiveness enhancements */
 @media (max-width: 768px) {
   .main-header {
     padding: 12px 16px;
