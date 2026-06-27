@@ -4,6 +4,21 @@ import { postApi, residentApi } from '../services/api';
 import { FormButton, FormInput } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
+const getCategoryStyle = (category) => {
+  switch (category) {
+    case 'Notice':
+      return { backgroundColor: '#FEF3C7', color: '#D97706' };
+    case 'Event':
+      return { backgroundColor: '#EEF2FF', color: '#4F46E5' };
+    case 'Complaint':
+      return { backgroundColor: '#FEE2E2', color: '#DC2626' };
+    case 'Lost & Found':
+      return { backgroundColor: '#CCFBF1', color: '#0D9488' };
+    default:
+      return { backgroundColor: '#F3F4F6', color: '#4B5563' };
+  }
+};
+
 export default function Community() {
   const toast = useToast();
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
@@ -18,7 +33,8 @@ export default function Community() {
 
   const [formData, setFormData] = useState({
     title: '',
-    description: ''
+    description: '',
+    category: 'General'
   });
   const [publishing, setPublishing] = useState(false);
 
@@ -57,11 +73,12 @@ export default function Community() {
         title: formData.title.trim(),
         description: formData.description.trim(),
         authorName: currentResident ? currentResident.name : 'Resident',
-        flatNo: currentResident ? currentResident.flatNo : 'N/A'
+        flatNo: currentResident ? currentResident.flatNo : 'N/A',
+        category: formData.category
       };
       const created = await postApi.create(postPayload);
       setPosts(prev => [created, ...prev]);
-      setFormData({ title: '', description: '' });
+      setFormData({ title: '', description: '', category: 'General' });
       setIsModalOpen(false);
       toast.success('Post published to community board!');
     } catch (err) {
@@ -130,19 +147,31 @@ export default function Community() {
                       {post.title}
                     </h4>
                     
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '4px 10px',
-                      borderRadius: '20px',
-                      backgroundColor: 'var(--primary-light)',
-                      color: 'var(--primary)',
-                      fontWeight: '700',
-                      fontSize: '0.8rem'
-                    }}>
-                      <span>{post.authorName} ({post.flatNo})</span>
-                    </span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontWeight: '700',
+                        fontSize: '0.8rem',
+                        ...getCategoryStyle(post.category)
+                      }}>
+                        {post.category || 'General'}
+                      </span>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        backgroundColor: 'var(--primary-light)',
+                        color: 'var(--primary)',
+                        fontWeight: '700',
+                        fontSize: '0.8rem'
+                      }}>
+                        <span>{post.authorName} ({post.flatNo})</span>
+                      </span>
+                    </div>
                   </div>
 
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
@@ -262,6 +291,37 @@ export default function Community() {
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 required
               />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+                  Category <span style={{ color: 'var(--accent)' }}>*</span>
+                </label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-main)',
+                    fontSize: '0.95rem',
+                    fontFamily: 'var(--font-sans)',
+                    outline: 'none',
+                    transition: 'var(--transition)'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--border-focus)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+                >
+                  <option value="General">General</option>
+                  <option value="Notice">Notice</option>
+                  <option value="Event">Event</option>
+                  <option value="Complaint">Complaint</option>
+                  <option value="Lost & Found">Lost & Found</option>
+                </select>
+              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)' }}>

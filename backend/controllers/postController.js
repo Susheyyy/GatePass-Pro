@@ -12,22 +12,26 @@ const getPosts = async (req, res) => {
 };
 
 const createPost = async (req, res) => {
-  const { title, description, authorName, flatNo } = req.body;
+  const { title, description, authorName, flatNo, category } = req.body;
   try {
     const newPost = new Post({
       title,
       description,
       authorName,
-      flatNo
+      flatNo,
+      category: category || 'General'
     });
     const saved = await newPost.save();
     try {
-      await Notification.create({
+      const newNotif = await Notification.create({
         recipient: 'all',
         title: 'New Community Announcement',
         message: `${authorName} (Flat ${flatNo}) posted: "${title}"`,
         type: 'community'
       });
+      if (req.io) {
+        req.io.emit('new_notification', newNotif);
+      }
     } catch (err) {
       console.error('Error creating notification:', err);
     }

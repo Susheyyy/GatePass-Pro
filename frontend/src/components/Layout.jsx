@@ -4,12 +4,48 @@ import { LayoutDashboard, Users, ShieldAlert, LogOut, Shield, Bell, CheckCircle2
 import { notificationApi, residentApi } from '../services/api';
 import { connectSocket, getSocket, disconnectSocket } from '../services/socket';
 
+const playAlarmSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(800, audioCtx.currentTime);
+    osc1.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.5);
+    osc1.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 1.0);
+    
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(400, audioCtx.currentTime);
+    
+    gainNode.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+    
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc1.start();
+    osc2.start();
+    
+    setTimeout(() => {
+      osc1.stop();
+      osc2.stop();
+      audioCtx.close();
+    }, 1500);
+  } catch (err) {
+    console.error('Audio Context Error:', err);
+  }
+};
+
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [flatNo, setFlatNo] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [activeDistressBanner, setActiveDistressBanner] = useState(null);
 
   const handleLogout = () => {
     localStorage.removeItem('gatepass_token');
@@ -60,8 +96,23 @@ export default function Layout({ children }) {
         setNotifications(prev => [newNotif, ...prev]);
       });
 
+      if (userRole === 'admin') {
+        socket.on('distress_alert', (data) => {
+          setActiveDistressBanner(data);
+          playAlarmSound();
+        });
+
+        socket.on('distress_resolved', (data) => {
+          setActiveDistressBanner(prev => (prev && prev.residentId === data.residentId ? null : prev));
+        });
+      }
+
       return () => {
         socket.off('new_notification');
+        if (userRole === 'admin') {
+          socket.off('distress_alert');
+          socket.off('distress_resolved');
+        }
         disconnectSocket();
       };
     }
@@ -90,6 +141,67 @@ export default function Layout({ children }) {
 
   return (
     <div className="layout-wrapper">
+      {activeDistressBanner && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '90%',
+          maxWidth: '600px',
+          backgroundColor: '#DC2626',
+          color: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px -12px rgba(220, 38, 38, 0.4)',
+          padding: '20px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '15px',
+          zIndex: 99999,
+          border: '2px solid rgba(255, 255, 255, 0.2)',
+          animation: 'scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              borderRadius: '50%',
+              width: '45px',
+              height: '45px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              animation: 'pulse 1s infinite'
+            }}>
+              <ShieldAlert size={26} color="white" />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Emergency Distress Active
+              </h4>
+              <p style={{ margin: '4px 0 0', fontSize: '0.9rem', opacity: 0.95, fontWeight: '500' }}>
+                Resident <strong>{activeDistressBanner.name}</strong> from <strong>Flat {activeDistressBanner.flatNo}</strong> is requesting immediate assistance.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setActiveDistressBanner(null)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              padding: '8px 16px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            Acknowledge
+          </button>
+        </div>
+      )}
       <header className="main-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <h1 style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.025em', color: 'var(--text-main)' }}>

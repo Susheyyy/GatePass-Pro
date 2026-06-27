@@ -129,20 +129,60 @@ export default function Visitors() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (visitors.length === 0) {
+      toast.warning('No visitor logs to export.');
+      return;
+    }
+
+    const headers = ['Visitor Name', 'Mobile', 'Type', 'Purpose', 'Vehicle Number', 'Destination Flat', 'Passcode', 'Status', 'Checked In At', 'Checked Out At'];
+    const rows = visitors.map(v => [
+      v.name || '',
+      v.mobile || '',
+      v.type || '',
+      v.purpose || '',
+      v.vehicleNumber || '',
+      v.flatNo || '',
+      v.passcode || '',
+      v.status || '',
+      v.checkedInAt ? new Date(v.checkedInAt).toLocaleString() : '',
+      v.checkedOutAt ? new Date(v.checkedOutAt).toLocaleString() : ''
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `visitor_logs_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Visitor logs exported to CSV.');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em' }}>
-Visitor Management 
+            Visitor Management 
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
             Manage current check-ins, approve visitor passcodes, and track society entry logs.
           </p>
         </div>
-        <FormButton onClick={() => setIsAddOpen(true)} variant="primary">
-          <span>New Entry Pass</span>
-        </FormButton>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {userRole === 'admin' && (
+            <FormButton onClick={handleExportCSV} variant="secondary">
+              <span>Export to CSV</span>
+            </FormButton>
+          )}
+          <FormButton onClick={() => setIsAddOpen(true)} variant="primary">
+            <span>New Entry Pass</span>
+          </FormButton>
+        </div>
       </div>
 
       <div className="content-card">

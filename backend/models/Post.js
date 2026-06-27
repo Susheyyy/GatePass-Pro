@@ -21,6 +21,11 @@ const postSchema = new mongoose.Schema({
     required: [true, 'Flat number is required'],
     trim: true
   },
+  category: {
+    type: String,
+    enum: ['Notice', 'Event', 'Complaint', 'Lost & Found', 'General'],
+    default: 'General'
+  },
   comments: [{
     text: { type: String, required: true },
     authorName: { type: String, required: true },
