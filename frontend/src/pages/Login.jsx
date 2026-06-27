@@ -71,31 +71,28 @@ export default function Login() {
         return;
       }
 
-      const residentsList = await residentApi.getAll();
-      const matchedResident = residentsList.find(r => {
-        const firstName = r.name.trim().split(' ')[0].toLowerCase();
-        const flatClean = r.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const expectedEmail = `${firstName}.${flatClean}@gatepass.com`;
-        return formattedEmail === expectedEmail || r.email.toLowerCase() === formattedEmail;
-      });
+      try {
+        const loginRes = await residentApi.login(formattedEmail, password);
+        const matchedResident = loginRes.resident;
 
-      if (matchedResident) {
-        if (matchedResident.password === password) {
-          if (matchedResident.isFirstLogin || password === defaultResidentPassword) {
-            setResetUser(matchedResident);
-            setIsResetView(true);
-            setIsLoading(false);
-            return;
-          }
-
-          localStorage.setItem('gatepass_token', 'true');
-          localStorage.setItem('gatepass_role', 'resident');
-          localStorage.setItem('gatepass_resident_id', matchedResident._id);
-          localStorage.setItem('gatepass_resident_email', matchedResident.email);
+        if (matchedResident.isFirstLogin || password === defaultResidentPassword) {
+          setResetUser(matchedResident);
+          setIsResetView(true);
           setIsLoading(false);
-          navigate('/resident-dashboard');
           return;
         }
+
+        localStorage.setItem('gatepass_token', 'true');
+        localStorage.setItem('gatepass_role', 'resident');
+        localStorage.setItem('gatepass_resident_id', matchedResident._id);
+        localStorage.setItem('gatepass_resident_email', matchedResident.email);
+        setIsLoading(false);
+        navigate('/resident-dashboard');
+        return;
+      } catch (err) {
+        setValidationError(err.message || 'Access Denied. Check email or password.');
+        setIsLoading(false);
+        return;
       }
 
       setValidationError('Access Denied. Check email or password.');

@@ -32,6 +32,31 @@ const addLocalNotification = (notification) => {
 };
 
 export const residentApi = {
+  login: async (email, password) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/login`, { email, password });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      console.warn('Backend offline, logging in locally:', error.message);
+      const list = getLocalResidents();
+      const matched = list.find(r => {
+        const firstName = r.name.trim().split(' ')[0].toLowerCase();
+        const flatClean = r.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const expectedEmail = `${firstName}.${flatClean}@gatepass.com`;
+        return email.trim().toLowerCase() === expectedEmail || r.email.toLowerCase() === email.trim().toLowerCase();
+      });
+      if (matched && matched.password === password) {
+        const responseObj = { ...matched };
+        delete responseObj.password;
+        return { resident: responseObj };
+      }
+      throw new Error('Access Denied. Check email or password.');
+    }
+  },
+
   getAll: async (searchQuery = '') => {
     try {
       const response = await axios.get(`${API_BASE_URL}`, {

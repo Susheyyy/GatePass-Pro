@@ -7,16 +7,41 @@ const getVisitors = async (req, res) => {
     if (flatNo) {
       query.flatNo = flatNo;
     }
-    if (search) {
-      const searchRegex = new RegExp(search, 'i');
-      query.$or = [
-        { name: searchRegex },
-        { type: searchRegex },
-        { passcode: searchRegex }
-      ];
+    
+    let visitors;
+    
+    if (search && /^\d{6}$/.test(search.trim())) {
+      const allVisitors = await Visitor.find(query).sort({ createdAt: -1 });
+      const matched = [];
+      const bcrypt = require('bcryptjs');
+      for (const v of allVisitors) {
+        if (v.passcode && (v.passcode.startsWith('$2') || v.passcode.length > 10)) {
+          if (bcrypt.compareSync(search.trim(), v.passcode)) {
+            matched.push(v);
+          }
+        } else if (v.passcode === search.trim()) {
+          matched.push(v);
+        }
+      }
+      visitors = matched;
+    } else {
+      if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        query.$or = [
+          { name: searchRegex },
+          { type: searchRegex }
+        ];
+      }
+      visitors = await Visitor.find(query).sort({ createdAt: -1 });
     }
-    const visitors = await Visitor.find(query).sort({ createdAt: -1 });
-    res.status(200).json(visitors);
+
+    const masked = visitors.map(v => {
+      const obj = v.toObject();
+      obj.passcode = '••••••';
+      return obj;
+    });
+
+    res.status(200).json(masked);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -37,7 +62,11 @@ const addVisitor = async (req, res) => {
       passcode: generatedPasscode,
       status: status || 'Approved'
     });
-    res.status(201).json(visitor);
+    
+    const responseObj = visitor.toObject();
+    responseObj.passcode = generatedPasscode;
+    
+    res.status(201).json(responseObj);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

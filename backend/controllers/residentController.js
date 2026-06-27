@@ -24,7 +24,7 @@ const getResidents = async (req, res) => {
       ];
     }
     
-    const residents = await Resident.find(query).sort({ createdAt: -1 });
+    const residents = await Resident.find(query).select('-password').sort({ createdAt: -1 });
     res.status(200).json(residents);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -283,6 +283,49 @@ const resetForgotPassword = async (req, res) => {
   }
 };
 
+const loginResident = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+    
+    const formattedEmail = email.trim().toLowerCase();
+    const resident = await Resident.findOne({
+      $or: [
+        { email: formattedEmail },
+        { gmail: formattedEmail }
+      ]
+    });
+
+    if (!resident) {
+      return res.status(404).json({ message: 'Resident not found' });
+    }
+
+    const bcrypt = require('bcryptjs');
+    let isMatch = false;
+    if (resident.password.startsWith('$2') || resident.password.length > 10) {
+      isMatch = await bcrypt.compare(password, resident.password);
+    } else {
+      isMatch = resident.password === password;
+    }
+
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid password' });
+    }
+
+    const responseObj = resident.toObject();
+    delete responseObj.password;
+
+    res.status(200).json({
+      message: 'Login successful',
+      resident: responseObj
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getResidents,
   addResident,
@@ -290,5 +333,6 @@ module.exports = {
   deleteResident,
   resendOtp,
   forgotPassword,
-  resetForgotPassword
+  resetForgotPassword,
+  loginResident
 };

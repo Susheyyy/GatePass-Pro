@@ -45,4 +45,17 @@ const visitorSchema = new mongoose.Schema({
   timestamps: true
 });
 
+const bcrypt = require('bcryptjs');
+
+visitorSchema.pre('save', async function(next) {
+  if (!this.isModified('passcode')) return next();
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.passcode = await bcrypt.hash(this.passcode, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = mongoose.model('Visitor', visitorSchema);

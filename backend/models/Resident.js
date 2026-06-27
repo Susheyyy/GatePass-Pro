@@ -74,6 +74,19 @@ const residentSchema = new mongoose.Schema({
   timestamps: true
 });
 
+const bcrypt = require('bcryptjs');
+
+residentSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 residentSchema.index({ name: 'text', flatNo: 'text' });
 
 module.exports = mongoose.model('Resident', residentSchema);
