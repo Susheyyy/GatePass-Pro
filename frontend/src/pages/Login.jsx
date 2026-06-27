@@ -591,6 +591,24 @@ export default function Login() {
                 </>
               )}
             </button>
+            
+            <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              New resident?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/register')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--primary)',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                Request Registration
+              </button>
+            </div>
           </form>
         ) : (
           <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

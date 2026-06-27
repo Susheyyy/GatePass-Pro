@@ -57,6 +57,62 @@ export const residentApi = {
     }
   },
 
+  bulkCreate: async (residents) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/bulk`, { residents });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      console.warn('Backend offline, saving bulk to LocalStorage:', error.message);
+      const list = getLocalResidents();
+      const created = [];
+      const errors = [];
+      for (const r of residents) {
+        const existingGmail = list.find(res => res.gmail.toLowerCase() === r.gmail.trim().toLowerCase());
+        if (existingGmail) {
+          errors.push(`Flat ${r.flatNo}: Gmail ${r.gmail} already exists`);
+          continue;
+        }
+        const existingFlat = list.find(res => res.flatNo.toLowerCase() === r.flatNo.trim().toLowerCase());
+        if (existingFlat) {
+          errors.push(`Flat ${r.flatNo}: Flat already registered`);
+          continue;
+        }
+        const firstName = r.name.trim().split(' ')[0].toLowerCase();
+        const flatClean = r.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        const newRes = {
+          ...r,
+          email: generatedEmail,
+          status: 'Approved',
+          otp: generatedOtp,
+          password: 'resident123',
+          isFirstLogin: true,
+          communityId: Math.floor(10000 + Math.random() * 90000).toString(),
+          bio: 'Resident of GatePass Pro Community.',
+          location: 'GatePass Residency',
+          address: `Flat ${r.flatNo}, GatePass Residency`,
+          _id: 'mock-' + Math.random().toString(36).substr(2, 9),
+          createdAt: new Date().toISOString()
+        };
+        list.push(newRes);
+        created.push(newRes);
+      }
+      saveLocalResidents(list);
+      if (errors.length > 0 && created.length === 0) {
+        throw new Error(errors.join('; '));
+      }
+      return {
+        message: `Successfully imported ${created.length} residents.`,
+        createdCount: created.length,
+        errors: errors.length > 0 ? errors : undefined
+      };
+    }
+  },
+
   getAll: async (searchQuery = '') => {
     try {
       const response = await axios.get(`${API_BASE_URL}`, {

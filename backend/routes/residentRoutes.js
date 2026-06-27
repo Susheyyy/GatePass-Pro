@@ -8,13 +8,15 @@ const {
   resendOtp,
   forgotPassword,
   resetForgotPassword,
-  loginResident
+  loginResident,
+  bulkCreateResidents
 } = require('../controllers/residentController');
 
 router.route('/')
   .get(getResidents)
   .post(addResident);
 
+router.post('/bulk', bulkCreateResidents);
 router.post('/login', loginResident);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetForgotPassword);

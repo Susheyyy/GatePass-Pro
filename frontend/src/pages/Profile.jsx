@@ -182,257 +182,243 @@ export default function Profile() {
 
       <div className="content-card" style={{ padding: '40px 30px' }}>
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 2fr',
-          gap: '40px',
-          alignItems: 'start'
-        }} className="grid-cols-mobile">
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '40px'
+        }}>
           
+          {/* Top Identity Block */}
           <div style={{
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             gap: '24px',
-            textAlign: 'center',
-            borderRight: '1px solid var(--border)',
-            paddingRight: '40px'
-          }} className="profile-left-col">
+            borderBottom: '1px solid var(--border)',
+            paddingBottom: '30px',
+            flexWrap: 'wrap'
+          }}>
             <div style={{
-              width: '120px',
-              height: '120px',
+              width: '90px',
+              height: '90px',
               borderRadius: '50%',
               background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
               color: 'white',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '2.5rem',
+              fontSize: '2rem',
               fontWeight: '800',
               boxShadow: '0 8px 24px rgba(50, 11, 53, 0.15)'
             }}>
               {initials}
             </div>
 
-            <div>
-              <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: 'var(--text-main)' }}>{profile.name}</h3>
-              <span style={{
-                display: 'inline-block',
-                marginTop: '6px',
-                padding: '4px 12px',
-                backgroundColor: 'var(--primary-light)',
-                color: 'var(--primary)',
-                fontWeight: '700',
-                fontSize: '0.75rem',
-                borderRadius: '12px'
-              }}>
-                {userRole === 'admin' ? 'Community Administrator' : 'Resident Member'}
-              </span>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-main)' }}>{profile.name}</h3>
+              </div>
             </div>
 
-            {userRole !== 'admin' && formData.bio && (
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, fontStyle: 'italic' }}>
-                "{formData.bio}"
-              </p>
-            )}
-
-            <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '6px', 
+              fontSize: '0.85rem', 
+              minWidth: '240px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Community ID</span>
                 <span style={{ fontWeight: '700', color: 'var(--accent)' }}>GP-{profile.communityId}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Gmail ID</span>
                 <span style={{ fontWeight: '600' }}>{profile.gmail || profile.email}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Sign-in User</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Username</span>
                 <span style={{ fontWeight: '600' }}>{profile.email}</span>
               </div>
             </div>
           </div>
 
+          {/* Profile Details (Section 1) */}
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <User size={18} style={{ color: 'var(--primary)' }} />
+              <span>Profile Details</span>
+            </h3>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
-            
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <FormInput
+                label="Bio"
+                value={formData.bio}
+                onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
+                icon={FileText}
+                placeholder="e.g. Software engineer, Tower A"
+                disabled={userRole === 'admin'}
+              />
 
-            <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <User size={18} style={{ color: 'var(--primary)' }} />
-                <span>Profile Details</span>
-              </h3>
-
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
                 <FormInput
-                  label="Bio"
-                  value={formData.bio}
-                  onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                  icon={FileText}
-                  placeholder="e.g. Software engineer, Tower A"
+                  label="Location"
+                  value={formData.location}
+                  onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                  icon={MapPin}
+                  placeholder="e.g. Tower B, GatePass residency"
                   disabled={userRole === 'admin'}
                 />
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
-                  <FormInput
-                    label="Location"
-                    value={formData.location}
-                    onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                    icon={MapPin}
-                    placeholder="e.g. Tower B, GatePass residency"
-                    disabled={userRole === 'admin'}
-                  />
+                <FormInput
+                  label="Residency Address"
+                  value={formData.address}
+                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                  icon={Building}
+                  placeholder="e.g. Flat A-202"
+                  disabled={userRole === 'admin'}
+                />
+              </div>
 
-                  <FormInput
-                    label="Residency Address"
-                    value={formData.address}
-                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                    icon={Building}
-                    placeholder="e.g. Flat A-202"
-                    disabled={userRole === 'admin'}
-                  />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
+                <FormInput
+                  label="Gmail ID"
+                  value={formData.gmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, gmail: e.target.value }))}
+                  icon={Mail}
+                  placeholder="e.g. rajesh@gmail.com"
+                  disabled={true}
+                />
+
+                <FormInput
+                  label="Phone Number"
+                  value={formData.mobile}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
+                  icon={Phone}
+                  placeholder="e.g. 9876543210"
+                  disabled={true}
+                />
+              </div>
+
+              {userRole !== 'admin' && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                  <FormButton type="submit" variant="primary" disabled={updating} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Save size={16} />
+                    <span>{updating ? 'Saving...' : 'Save Profile Changes'}</span>
+                  </FormButton>
                 </div>
+              )}
+            </form>
+          </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
-                  <FormInput
-                    label="Gmail ID"
-                    value={formData.gmail}
-                    onChange={(e) => setFormData(prev => ({ ...prev, gmail: e.target.value }))}
-                    icon={Mail}
-                    placeholder="e.g. rajesh@gmail.com"
-                    disabled={true}
-                  />
+          <div style={{ height: '1px', backgroundColor: 'var(--border)' }}></div>
 
-                  <FormInput
-                    label="Phone Number"
-                    value={formData.mobile}
-                    onChange={(e) => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
-                    icon={Phone}
-                    placeholder="e.g. 9876543210"
-                    disabled={true}
-                  />
-                </div>
+          {/* Security & Password Controls (Section 2) */}
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <KeyRound size={18} style={{ color: 'var(--primary)' }} />
+              <span>Security & Password Controls</span>
+            </h3>
 
-                {userRole !== 'admin' && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-                    <FormButton type="submit" variant="primary" disabled={updating} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <Save size={16} />
-                      <span>{updating ? 'Saving...' : 'Save Profile Changes'}</span>
-                    </FormButton>
+            <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {!otpSent ? (
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end' }} className="grid-cols-mobile">
+                  <div style={{ flex: 1 }}>
+                    <FormInput
+                      label="Current Password"
+                      type="password"
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                      icon={KeyRound}
+                      placeholder="••••••••"
+                      required
+                    />
                   </div>
-                )}
-              </form>
-            </div>
-
-            <div style={{ height: '1px', backgroundColor: 'var(--border)' }}></div>
-
-            <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <KeyRound size={18} style={{ color: 'var(--primary)' }} />
-                <span>Security & Password Controls</span>
-              </h3>
-
-              <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                
-                {!otpSent ? (
-                  <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end' }} className="grid-cols-mobile">
-                    <div style={{ flex: 1 }}>
-                      <FormInput
-                        label="Current Password"
-                        type="password"
-                        value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                        icon={KeyRound}
-                        placeholder="••••••••"
-                        required
-                      />
-                    </div>
-                    {userRole !== 'admin' && (
-                      <button
-                        type="button"
-                        onClick={handleRequestOtp}
-                        disabled={sendingOtp}
-                        style={{
-                          padding: '12px 20px',
-                          borderRadius: '10px',
-                          border: '1px solid var(--border)',
-                          backgroundColor: 'var(--bg-main)',
-                          color: 'var(--accent)',
-                          fontWeight: '700',
-                          fontSize: '0.85rem',
-                          cursor: 'pointer',
-                          marginBottom: '2px',
-                          transition: 'var(--transition)'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-light)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}
-                      >
-                        {sendingOtp ? 'Sending OTP...' : 'Forgot Password?'}
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end' }} className="grid-cols-mobile">
-                    <div style={{ flex: 1 }}>
-                      <FormInput
-                        label="Enter OTP Verification Code"
-                        type="text"
-                        value={passwordData.otp}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, otp: e.target.value }))}
-                        icon={KeyRound}
-                        placeholder="6-digit OTP code"
-                        required
-                      />
-                    </div>
+                  {userRole !== 'admin' && (
                     <button
                       type="button"
-                      onClick={() => setOtpSent(false)}
+                      onClick={handleRequestOtp}
+                      disabled={sendingOtp}
                       style={{
                         padding: '12px 20px',
                         borderRadius: '10px',
                         border: '1px solid var(--border)',
                         backgroundColor: 'var(--bg-main)',
-                        color: 'var(--text-muted)',
+                        color: 'var(--accent)',
                         fontWeight: '700',
                         fontSize: '0.85rem',
                         cursor: 'pointer',
-                        marginBottom: '2px'
+                        marginBottom: '2px',
+                        transition: 'var(--transition)'
                       }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-light)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}
                     >
-                      Use Current Password
+                      {sendingOtp ? 'Sending OTP...' : 'Forgot Password?'}
                     </button>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end' }} className="grid-cols-mobile">
+                  <div style={{ flex: 1 }}>
+                    <FormInput
+                      label="Enter OTP Verification Code"
+                      type="text"
+                      value={passwordData.otp}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, otp: e.target.value }))}
+                      icon={KeyRound}
+                      placeholder="6-digit OTP code"
+                      required
+                    />
                   </div>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
-                  <FormInput
-                    label="New Password"
-                    type="password"
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                    icon={KeyRound}
-                    placeholder="••••••••"
-                    required
-                  />
-
-                  <FormInput
-                    label="Confirm New Password"
-                    type="password"
-                    value={passwordData.confirmNewPassword}
-                    onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-                    icon={KeyRound}
-                    placeholder="••••••••"
-                    required
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setOtpSent(false)}
+                    style={{
+                      padding: '12px 20px',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--bg-main)',
+                      color: 'var(--text-muted)',
+                      fontWeight: '700',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      marginBottom: '2px'
+                    }}
+                  >
+                    Use Current Password
+                  </button>
                 </div>
+              )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-                  <FormButton type="submit" variant="primary" disabled={changingPassword} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <Save size={16} />
-                    <span>{changingPassword ? 'Updating...' : 'Update Password'}</span>
-                  </FormButton>
-                </div>
-              </form>
-            </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
+                <FormInput
+                  label="New Password"
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  icon={KeyRound}
+                  placeholder="••••••••"
+                  required
+                />
 
+                <FormInput
+                  label="Confirm New Password"
+                  type="password"
+                  value={passwordData.confirmNewPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
+                  icon={KeyRound}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                <Save size={16} style={{ display: 'none' }} />
+                <FormButton type="submit" variant="primary" disabled={changingPassword} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <Save size={16} />
+                  <span>{changingPassword ? 'Updating...' : 'Update Password'}</span>
+                </FormButton>
+              </div>
+            </form>
           </div>
 
         </div>

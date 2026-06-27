@@ -158,6 +158,63 @@ export default function Residents() {
     }
   };
 
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await residentApi.update(id, { status: newStatus });
+      toast.success(`Resident status updated to ${newStatus}!`);
+      fetchResidents(searchQuery);
+    } catch (err) {
+      toast.error('Failed to update status.');
+    }
+  };
+
+  const handleCsvImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target.result;
+      try {
+        const lines = text.split('\n');
+        if (lines.length < 2) {
+          toast.warning('CSV file is empty or missing headers.');
+          return;
+        }
+        
+        const headers = lines[0].split(',').map(h => h.trim().replace(/['"]+/g, '').toLowerCase());
+        const residents = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          const values = line.split(',').map(v => v.trim().replace(/['"]+/g, ''));
+          const residentObj = {};
+          headers.forEach((header, index) => {
+            residentObj[header] = values[index];
+          });
+          
+          residentObj.members = parseInt(residentObj.members) || 1;
+          residents.push(residentObj);
+        }
+        
+        if (residents.length === 0) {
+          toast.warning('No residents found in the CSV file.');
+          return;
+        }
+        
+        const res = await residentApi.bulkCreate(residents);
+        toast.success(res.message || `Successfully imported ${residents.length} residents!`);
+        fetchResidents(searchQuery);
+      } catch (err) {
+        toast.error(err.message || 'Failed to import CSV file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const triggerDelete = (resident) => {
     setResidentToDelete(resident);
     setIsDeleteOpen(true);
@@ -202,10 +259,22 @@ export default function Residents() {
           </p>
         </div>
         
-        <FormButton onClick={handleOpenAdd} variant="primary">
-          <UserPlus size={18} />
-          <span>Add Resident</span>
-        </FormButton>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <input 
+            type="file" 
+            id="csv-file-input" 
+            accept=".csv" 
+            onChange={handleCsvImport} 
+            style={{ display: 'none' }} 
+          />
+          <FormButton onClick={() => document.getElementById('csv-file-input').click()} variant="secondary">
+            <span>Import CSV</span>
+          </FormButton>
+          <FormButton onClick={handleOpenAdd} variant="primary">
+            <UserPlus size={18} />
+            <span>Add Resident</span>
+          </FormButton>
+        </div>
       </div>
 
       {notification && (
@@ -421,6 +490,46 @@ export default function Residents() {
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        {resident.status === 'Pending' && (
+                          <>
+                            <button 
+                              onClick={() => handleStatusChange(resident._id, 'Approved')}
+                              title="Approve Resident"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--success)',
+                                padding: '6px',
+                                borderRadius: '6px',
+                                display: 'inline-flex',
+                                transition: 'var(--transition)'
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--success-light)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleStatusChange(resident._id, 'Rejected')}
+                              title="Reject Resident"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--accent)',
+                                padding: '6px',
+                                borderRadius: '6px',
+                                display: 'inline-flex',
+                                transition: 'var(--transition)'
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--accent-light)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        )}
                         {resident.status !== 'Approved' && (
                           <button 
                             onClick={() => handleResendOtp(resident)}
