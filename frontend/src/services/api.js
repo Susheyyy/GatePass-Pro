@@ -451,9 +451,16 @@ export const visitorApi = {
     } catch (error) {
       console.warn('Backend offline, deleting visitor from LocalStorage:', error.message);
       const list = getLocalVisitors();
-      const filtered = list.filter(v => v._id !== id);
-      saveLocalVisitors(filtered);
-      return { message: 'Visitor removed successfully' };
+      const index = list.findIndex(v => v._id === id);
+      if (index !== -1) {
+        if (['Approved', 'Checked In', 'Checked Out'].includes(list[index].status)) {
+          throw new Error('Approved or checked-in/out visitor records cannot be removed');
+        }
+        list.splice(index, 1);
+        saveLocalVisitors(list);
+        return { message: 'Visitor removed successfully' };
+      }
+      throw new Error('Visitor not found in local storage');
     }
   }
 };

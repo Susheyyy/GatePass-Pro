@@ -110,6 +110,26 @@ export default function ResidentDashboard() {
     }
   };
 
+  const handleApproveVisitor = async (visitorId) => {
+    try {
+      const updated = await visitorApi.update(visitorId, { status: 'Approved' });
+      setVisitors(prev => prev.map(v => v._id === visitorId ? updated : v));
+      toast.success('Visitor approved successfully!');
+    } catch (err) {
+      toast.error('Failed to approve visitor.');
+    }
+  };
+
+  const handleRejectVisitor = async (visitorId) => {
+    try {
+      const updated = await visitorApi.update(visitorId, { status: 'Rejected' });
+      setVisitors(prev => prev.map(v => v._id === visitorId ? updated : v));
+      toast.success('Visitor rejected successfully!');
+    } catch (err) {
+      toast.error('Failed to reject visitor.');
+    }
+  };
+
   const handleMemberSubmit = async (e) => {
     e.preventDefault();
     if (!/^\d+$/.test(memberForm.mobile.trim())) {
@@ -504,7 +524,8 @@ export default function ResidentDashboard() {
                   <th style={{ paddingBottom: '12px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>Type</th>
                   <th style={{ paddingBottom: '12px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textAlign: 'center' }}>Passcode</th>
                   <th style={{ paddingBottom: '12px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textAlign: 'center' }}>Status</th>
-                  <th style={{ paddingBottom: '12px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textAlign: 'right' }}>Date</th>
+                  <th style={{ paddingBottom: '12px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textAlign: 'center' }}>Date</th>
+                  <th style={{ paddingBottom: '12px', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -528,17 +549,59 @@ export default function ResidentDashboard() {
                         backgroundColor: 
                           visitor.status === 'Checked In' ? 'var(--success-light)' : 
                           visitor.status === 'Checked Out' ? 'var(--border)' : 
+                          visitor.status === 'Approved' ? 'var(--primary-light)' : 
+                          visitor.status === 'Rejected' ? 'var(--accent-light)' : 
                           'var(--warning-light)',
                         color: 
                           visitor.status === 'Checked In' ? 'var(--success)' : 
                           visitor.status === 'Checked Out' ? 'var(--text-muted)' : 
+                          visitor.status === 'Approved' ? 'var(--primary)' : 
+                          visitor.status === 'Rejected' ? 'var(--accent)' : 
                           'var(--warning)'
                       }}>
                         {visitor.status}
                       </span>
                     </td>
-                    <td style={{ padding: '14px 0', textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <td style={{ padding: '14px 0', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       {new Date(visitor.createdAt).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '14px 0', textAlign: 'right' }}>
+                      {visitor.status === 'Pending' ? (
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleApproveVisitor(visitor._id)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              backgroundColor: 'var(--success-light)',
+                              color: 'var(--success)',
+                              fontWeight: '700',
+                              fontSize: '0.72rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectVisitor(visitor._id)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              backgroundColor: 'var(--accent-light)',
+                              color: 'var(--accent)',
+                              fontWeight: '700',
+                              fontSize: '0.72rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>-</span>
+                      )}
                     </td>
                   </tr>
                 ))}

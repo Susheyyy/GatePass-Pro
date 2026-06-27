@@ -33,6 +33,7 @@ export default function Visitors() {
     status: 'Pending'
   });
   const [selectedVisitor, setSelectedVisitor] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
 
   const fetchVisitors = async (query = '') => {
@@ -94,13 +95,14 @@ export default function Visitors() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to remove this visitor log?')) return;
     try {
       await visitorApi.delete(id);
       fetchVisitors(searchQuery);
       toast.success('Visitor log removed.');
     } catch (err) {
       toast.error('Failed to remove visitor.');
+    } finally {
+      setDeleteConfirmId(null);
     }
   };
 
@@ -115,11 +117,9 @@ Visitor Management
             Manage current check-ins, approve visitor passcodes, and track society entry logs.
           </p>
         </div>
-        {userRole !== 'security' && (
-          <FormButton onClick={() => setIsAddOpen(true)} variant="primary">
-            <span>New Entry Pass</span>
-          </FormButton>
-        )}
+        <FormButton onClick={() => setIsAddOpen(true)} variant="primary">
+          <span>New Entry Pass</span>
+        </FormButton>
       </div>
 
       <div className="content-card">
@@ -185,7 +185,6 @@ Visitor Management
                     </td>
                     <td style={{ padding: '16px', color: 'var(--text-main)', fontSize: '0.9rem' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <MapPin size={14} style={{ color: 'var(--text-muted)' }} />
                         Flat {visitor.flatNo}
                       </span>
                     </td>
@@ -217,24 +216,7 @@ Visitor Management
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        {visitor.status === 'Pending' && (
-                          <>
-                            <button
-                              onClick={() => handleStatusUpdate(visitor._id, 'Approved')}
-                              title="Approve Visitor"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--success)', padding: '6px' }}
-                            >
-                              <Check size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleStatusUpdate(visitor._id, 'Rejected')}
-                              title="Reject Visitor"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', padding: '6px' }}
-                            >
-                              <X size={16} />
-                            </button>
-                          </>
-                        )}
+
                         {visitor.status === 'Approved' && (
                           <button
                             onClick={() => handleStatusUpdate(visitor._id, 'Checked In')}
@@ -253,9 +235,9 @@ Visitor Management
                             <LogOut size={16} />
                           </button>
                         )}
-                        {userRole !== 'security' && (
+                        {userRole !== 'security' && visitor.status !== 'Approved' && visitor.status !== 'Checked In' && visitor.status !== 'Checked Out' && (
                           <button
-                            onClick={() => handleDelete(visitor._id)}
+                            onClick={() => setDeleteConfirmId(visitor._id)}
                             title="Delete Record"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px' }}
                           >
@@ -503,6 +485,49 @@ Visitor Management
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
               <FormButton onClick={() => setSelectedVisitor(null)} variant="secondary">
                 Close
+              </FormButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmId && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1100,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '90%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
+            padding: '30px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)' }}>Confirm Deletion</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              Are you sure you want to remove this visitor log? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+              <FormButton onClick={() => setDeleteConfirmId(null)} variant="secondary" style={{ flex: 1 }}>
+                Cancel
+              </FormButton>
+              <FormButton onClick={() => handleDelete(deleteConfirmId)} variant="primary" style={{ flex: 1, backgroundColor: 'var(--accent)' }}>
+                Delete
               </FormButton>
             </div>
           </div>

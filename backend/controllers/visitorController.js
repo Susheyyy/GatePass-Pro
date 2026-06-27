@@ -95,6 +95,9 @@ const deleteVisitor = async (req, res) => {
     if (!visitor) {
       return res.status(404).json({ message: 'Visitor not found' });
     }
+    if (['Approved', 'Checked In', 'Checked Out'].includes(visitor.status)) {
+      return res.status(400).json({ message: 'Approved or checked-in/out visitor records cannot be removed' });
+    }
     await visitor.deleteOne();
     res.status(200).json({ message: 'Visitor removed successfully' });
   } catch (error) {

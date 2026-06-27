@@ -71,7 +71,8 @@ export default function Layout({ children }) {
       ]
     : userRole === 'security'
     ? [
-        { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> }
+        { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> },
+        { path: '/profile', label: 'My Profile', icon: <User size={18} /> }
       ]
     : [
         { path: '/resident-dashboard', label: 'Resident Dashboard', icon: <LayoutDashboard size={18} /> },
