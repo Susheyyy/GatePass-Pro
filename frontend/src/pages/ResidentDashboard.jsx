@@ -17,6 +17,7 @@ import {
 import { residentApi, visitorApi } from '../services/api';
 import { FormButton, FormInput } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
+import { getSocket } from '../services/socket';
 
 export default function ResidentDashboard() {
   const toast = useToast();
@@ -72,6 +73,28 @@ export default function ResidentDashboard() {
   useEffect(() => {
     fetchResidentDetails();
   }, [residentId, residentEmail]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (socket) {
+      const handleVisitorChange = (updatedVisitor) => {
+        setVisitors(prev => {
+          const exists = prev.some(v => v._id === updatedVisitor._id);
+          if (exists) {
+            return prev.map(v => v._id === updatedVisitor._id ? updatedVisitor : v);
+          } else {
+            return [updatedVisitor, ...prev];
+          }
+        });
+      };
+
+      socket.on('visitor_check_status', handleVisitorChange);
+
+      return () => {
+        socket.off('visitor_check_status', handleVisitorChange);
+      };
+    }
+  }, []);
 
   const handleUpdateStatus = async (newStatus) => {
     if (!resident) return;

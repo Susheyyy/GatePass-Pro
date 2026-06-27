@@ -13,6 +13,7 @@ import {
   X 
 } from 'lucide-react';
 import { visitorApi } from '../services/api';
+import { getSocket } from '../services/socket';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
@@ -50,6 +51,28 @@ export default function Visitors() {
 
   useEffect(() => {
     fetchVisitors();
+  }, []);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (socket) {
+      const handleVisitorApprovalChange = (updatedVisitor) => {
+        setVisitors(prev => {
+          const exists = prev.some(v => v._id === updatedVisitor._id);
+          if (exists) {
+            return prev.map(v => v._id === updatedVisitor._id ? updatedVisitor : v);
+          } else {
+            return [updatedVisitor, ...prev];
+          }
+        });
+      };
+
+      socket.on('visitor_approval_changed', handleVisitorApprovalChange);
+
+      return () => {
+        socket.off('visitor_approval_changed', handleVisitorApprovalChange);
+      };
+    }
   }, []);
 
   const handleSearchChange = (e) => {

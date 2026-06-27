@@ -41,6 +41,14 @@ const addVisitor = async (req, res) => {
       purpose,
       vehicleNumber
     });
+
+    if (req.io) {
+      const roomFlat = `room_flat_${flatNo.toUpperCase().trim()}`;
+      req.io.to(roomFlat).emit('visitor_check_status', visitor);
+      req.io.to('room_security').emit('visitor_approval_changed', visitor);
+      req.io.to('room_admins').emit('visitor_approval_changed', visitor);
+    }
+
     res.status(201).json(visitor);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -60,29 +68,43 @@ const updateVisitor = async (req, res) => {
         visitor.checkedInAt = new Date();
         try {
           const Notification = require('../models/Notification');
-          await Notification.create({
+          const newNotif = await Notification.create({
             recipient: visitor.flatNo,
             title: 'Visitor Checked In',
             message: `${visitor.name} (${visitor.type}) has checked in to your flat.`,
             type: 'visitor_checkin'
           });
+          if (req.io) {
+            req.io.to(`room_flat_${visitor.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
+          }
         } catch (err) {
         }
       } else if (status === 'Checked Out') {
         visitor.checkedOutAt = new Date();
         try {
           const Notification = require('../models/Notification');
-          await Notification.create({
+          const newNotif = await Notification.create({
             recipient: visitor.flatNo,
             title: 'Visitor Checked Out',
             message: `${visitor.name} (${visitor.type}) has checked out from your flat.`,
             type: 'visitor_checkout'
           });
+          if (req.io) {
+            req.io.to(`room_flat_${visitor.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
+          }
         } catch (err) {
         }
       }
     }
     const updatedVisitor = await visitor.save();
+
+    if (req.io) {
+      const roomFlat = `room_flat_${visitor.flatNo.toUpperCase().trim()}`;
+      req.io.to(roomFlat).emit('visitor_check_status', updatedVisitor);
+      req.io.to('room_security').emit('visitor_approval_changed', updatedVisitor);
+      req.io.to('room_admins').emit('visitor_approval_changed', updatedVisitor);
+    }
+
     res.status(200).json(updatedVisitor);
   } catch (error) {
     res.status(400).json({ message: error.message });

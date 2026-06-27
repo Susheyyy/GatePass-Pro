@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { residentApi, visitorApi, notificationApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { getSocket } from '../services/socket';
 
 export default function Dashboard() {
   const toast = useToast();
@@ -21,6 +22,46 @@ export default function Dashboard() {
     pendingAlerts: 0,
     recentVisitors: []
   });
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (socket) {
+      const reloadStats = async () => {
+        try {
+          const residents = await residentApi.getAll();
+          const visitorsList = await visitorApi.getAll();
+          const activeVisitors = visitorsList.filter(v => v.status === 'Checked In').length;
+          let pendingAlerts = 0;
+          residents.forEach(r => {
+            if (r.distressStatus === 'Active') {
+              pendingAlerts += 1;
+            }
+          });
+          const recent = visitorsList.slice(0, 4);
+          setData({
+            activeVisitors,
+            totalResidents: residents.length,
+            pendingAlerts,
+            recentVisitors: recent
+          });
+        } catch (err) {
+          console.error('Error reloading dashboard stats on socket event:', err);
+        }
+      };
+
+      socket.on('distress_alert', reloadStats);
+      socket.on('distress_resolved', reloadStats);
+      socket.on('visitor_approval_changed', reloadStats);
+      socket.on('visitor_check_status', reloadStats);
+
+      return () => {
+        socket.off('distress_alert', reloadStats);
+        socket.off('distress_resolved', reloadStats);
+        socket.off('visitor_approval_changed', reloadStats);
+        socket.off('visitor_check_status', reloadStats);
+      };
+    }
+  }, []);
   const [loading, setLoading] = useState(true);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [alertTitle, setAlertTitle] = useState('Gate Security Broadcast');

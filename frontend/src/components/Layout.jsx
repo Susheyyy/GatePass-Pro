@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, ShieldAlert, LogOut, Shield, Bell, CheckCircle2, User, MessageSquare, Trash2 } from 'lucide-react';
 import { notificationApi, residentApi } from '../services/api';
+import { connectSocket, getSocket, disconnectSocket } from '../services/socket';
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
@@ -48,13 +49,20 @@ export default function Layout({ children }) {
   };
 
   useEffect(() => {
-    if (userRole === 'admin' || (userRole === 'resident' && flatNo)) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 8000);
-      window.addEventListener('mock_notification_sent', fetchNotifications);
+    if (userRole === 'admin' || userRole === 'security' || (userRole === 'resident' && flatNo)) {
+      if (userRole === 'admin' || (userRole === 'resident' && flatNo)) {
+        fetchNotifications();
+      }
+
+      const socket = connectSocket(userRole, flatNo);
+
+      socket.on('new_notification', (newNotif) => {
+        setNotifications(prev => [newNotif, ...prev]);
+      });
+
       return () => {
-        clearInterval(interval);
-        window.removeEventListener('mock_notification_sent', fetchNotifications);
+        socket.off('new_notification');
+        disconnectSocket();
       };
     }
   }, [userRole, flatNo]);

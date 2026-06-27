@@ -203,20 +203,29 @@ const updateResident = async (req, res) => {
       if (distressStatus && distressStatus !== resident.distressStatus) {
         resident.distressStatus = distressStatus;
         if (distressStatus === 'Resolved' || distressStatus === 'Dismissed') {
+          if (req.io) {
+            req.io.to('room_admins').emit('distress_resolved', { residentId: resident._id });
+          }
           try {
             const Notification = require('../models/Notification');
-            await Notification.create({
+            const newNotif = await Notification.create({
               recipient: resident.flatNo,
               title: `Distress Alert ${distressStatus}`,
               message: `Your distress alert has been marked as ${distressStatus.toLowerCase()} by the administrator.`,
               type: 'distress_reply'
             });
+            if (req.io) {
+              req.io.to(`room_flat_${resident.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
+            }
           } catch (notifErr) {}
         }
       }
       if (clearDistress) {
         resident.distressMessages = [];
         resident.distressStatus = 'None';
+        if (req.io) {
+          req.io.to('room_admins').emit('distress_resolved', { residentId: resident._id });
+        }
       }
       if (distressMessage) {
         const msgSender = sender || 'resident';
@@ -226,23 +235,38 @@ const updateResident = async (req, res) => {
         });
         if (msgSender !== 'admin') {
           resident.distressStatus = 'Active';
+          if (req.io) {
+            req.io.to('room_admins').emit('distress_alert', {
+              residentId: resident._id,
+              flatNo: resident.flatNo,
+              name: resident.name,
+              distressStatus: 'Active',
+              messages: resident.distressMessages
+            });
+          }
         }
         try {
           const Notification = require('../models/Notification');
           if (msgSender === 'admin') {
-            await Notification.create({
+            const newNotif = await Notification.create({
               recipient: resident.flatNo,
               title: 'New Distress Response',
               message: `Admin replied: "${distressMessage.length > 50 ? distressMessage.substring(0, 50) + '...' : distressMessage}"`,
               type: 'distress_reply'
             });
+            if (req.io) {
+              req.io.to(`room_flat_${resident.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
+            }
           } else {
-            await Notification.create({
+            const newNotif = await Notification.create({
               recipient: 'admin',
               title: 'Distress Alert Received',
               message: `${resident.name} (Flat ${resident.flatNo}) distress: "${distressMessage.length > 50 ? distressMessage.substring(0, 50) + '...' : distressMessage}"`,
               type: 'distress_reply'
             });
+            if (req.io) {
+              req.io.to('room_admins').emit('new_notification', newNotif);
+            }
           }
         } catch (err) {
           console.error('Error creating distress notification:', err);
