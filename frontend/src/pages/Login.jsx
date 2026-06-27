@@ -61,7 +61,8 @@ export default function Login() {
         return;
       }
 
-      if (formattedEmail === 'security@gatepass.com' && password === 'security123') {
+      const currentSecurityPass = localStorage.getItem('gatepass_security_password') || 'security123';
+      if (formattedEmail === 'security@gatepass.com' && password === currentSecurityPass) {
         localStorage.setItem('gatepass_token', 'true');
         localStorage.setItem('gatepass_role', 'security');
         localStorage.removeItem('gatepass_resident_id');

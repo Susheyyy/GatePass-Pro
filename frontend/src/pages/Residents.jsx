@@ -1,15 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { 
-  Users, 
-  UserPlus, 
+  Users,
   Search, 
   Edit3, 
   Trash2, 
-  Home, 
-  User, 
-  Phone, 
-  Mail, 
   X, 
   Check, 
   Info,
@@ -271,7 +266,6 @@ export default function Residents() {
             <span>Import CSV</span>
           </FormButton>
           <FormButton onClick={handleOpenAdd} variant="primary">
-            <UserPlus size={18} />
             <span>Add Resident</span>
           </FormButton>
         </div>
@@ -435,7 +429,7 @@ export default function Residents() {
                     <td style={{ padding: '16px', fontWeight: '600', color: 'var(--text-main)' }}>
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         <span>{resident.name}</span>
-                        {resident.distressMessages && resident.distressMessages.length > 0 && (
+                        {resident.distressMessages && resident.distressMessages.length > 0 && resident.distressStatus === 'Active' && (
                           <span 
                             onClick={() => { setSelectedDistressResident(resident); setIsDistressOpen(true); }}
                             title="Distress Messages Alert"
@@ -656,7 +650,6 @@ export default function Residents() {
                 placeholder="Enter flat number"
                 value={formData.flatNo}
                 onChange={handleInputChange}
-                icon={Home}
                 required
               />
 
@@ -666,7 +659,6 @@ export default function Residents() {
                 placeholder="Enter full name"
                 value={formData.name}
                 onChange={handleInputChange}
-                icon={User}
                 required
               />
 
@@ -676,7 +668,6 @@ export default function Residents() {
                 placeholder="Enter mobile number"
                 value={formData.mobile}
                 onChange={handleInputChange}
-                icon={Phone}
                 required
               />
 
@@ -684,10 +675,9 @@ export default function Residents() {
                 label="Gmail Address"
                 name="gmail"
                 type="email"
-                placeholder="Enter gmail address"
+                placeholder="Enter Gmail ID"
                 value={formData.gmail}
                 onChange={handleInputChange}
-                icon={Mail}
                 required
               />
 
@@ -698,7 +688,6 @@ export default function Residents() {
                 placeholder="Enter number of members"
                 value={formData.members}
                 onChange={handleInputChange}
-                icon={Users}
                 required
               />
 

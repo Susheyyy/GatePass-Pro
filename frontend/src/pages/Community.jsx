@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Plus, Send, Clock, User, FileText, X } from 'lucide-react';
+import { MessageSquare, Clock, X } from 'lucide-react';
 import { postApi, residentApi } from '../services/api';
 import { FormButton, FormInput } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
@@ -95,7 +95,7 @@ export default function Community() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em' }}>
-            Community Board
+            Community Feed
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
             View and publish posts shared across the organization.
@@ -111,10 +111,6 @@ export default function Community() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <MessageSquare size={18} style={{ color: 'var(--primary)' }} />
-            <span>Community Feed</span>
-          </h3>
 
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '40px', color: 'var(--text-muted)' }}>
@@ -145,7 +141,6 @@ export default function Community() {
                       fontWeight: '700',
                       fontSize: '0.8rem'
                     }}>
-                      <User size={12} />
                       <span>{post.authorName} ({post.flatNo})</span>
                     </span>
                   </div>
@@ -265,7 +260,6 @@ export default function Community() {
                 placeholder="e.g. Maintenance Scheduled"
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                icon={FileText}
                 required
               />
 

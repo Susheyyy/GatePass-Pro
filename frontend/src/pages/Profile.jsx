@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { User, Phone, MapPin, Building, FileText, KeyRound, Save, Mail } from 'lucide-react';
 import { residentApi } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
@@ -49,6 +48,25 @@ export default function Profile() {
         address: 'Gate Control Room',
         mobile: 'N/A',
         gmail: 'admin@gatepass.com'
+      });
+      setLoading(false);
+    } else if (userRole === 'security') {
+      setProfile({
+        name: 'Security Desk Officer',
+        email: 'security@gatepass.com',
+        role: 'Security',
+        mobile: 'N/A',
+        communityId: 'SECURITY',
+        bio: 'Gate supervisor for community guest validation and check-ins.',
+        location: 'Main Entry Gate 1',
+        address: 'Security Cabin'
+      });
+      setFormData({
+        bio: 'Gate supervisor for community guest validation and check-ins.',
+        location: 'Main Entry Gate 1',
+        address: 'Security Cabin',
+        mobile: 'N/A',
+        gmail: 'security@gatepass.com'
       });
       setLoading(false);
     } else {
@@ -136,6 +154,15 @@ export default function Profile() {
         }
         localStorage.setItem('gatepass_admin_password', passwordData.newPassword);
         toast.success('Admin password updated successfully!');
+      } else if (userRole === 'security') {
+        const currentSecurityPass = localStorage.getItem('gatepass_security_password') || 'security123';
+        if (passwordData.currentPassword !== currentSecurityPass) {
+          toast.error('Incorrect current password.');
+          setChangingPassword(false);
+          return;
+        }
+        localStorage.setItem('gatepass_security_password', passwordData.newPassword);
+        toast.success('Security password updated successfully!');
       } else {
         if (otpSent && passwordData.otp) {
           const emailToReset = profile.gmail || profile.email;
@@ -241,7 +268,6 @@ export default function Profile() {
 
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <User size={18} style={{ color: 'var(--primary)' }} />
               <span>Profile Details</span>
             </h3>
 
@@ -250,7 +276,6 @@ export default function Profile() {
                 label="Bio"
                 value={formData.bio}
                 onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                icon={FileText}
                 placeholder="e.g. Software engineer, Tower A"
                 disabled={userRole === 'admin'}
               />
@@ -260,7 +285,6 @@ export default function Profile() {
                   label="Location"
                   value={formData.location}
                   onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                  icon={MapPin}
                   placeholder="e.g. Tower B, GatePass residency"
                   disabled={userRole === 'admin'}
                 />
@@ -269,7 +293,6 @@ export default function Profile() {
                   label="Residency Address"
                   value={formData.address}
                   onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  icon={Building}
                   placeholder="e.g. Flat A-202"
                   disabled={userRole === 'admin'}
                 />
@@ -280,7 +303,6 @@ export default function Profile() {
                   label="Gmail ID"
                   value={formData.gmail}
                   onChange={(e) => setFormData(prev => ({ ...prev, gmail: e.target.value }))}
-                  icon={Mail}
                   placeholder="e.g. rajesh@gmail.com"
                   disabled={true}
                 />
@@ -289,7 +311,6 @@ export default function Profile() {
                   label="Phone Number"
                   value={formData.mobile}
                   onChange={(e) => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
-                  icon={Phone}
                   placeholder="e.g. 9876543210"
                   disabled={true}
                 />
@@ -298,8 +319,7 @@ export default function Profile() {
               {userRole !== 'admin' && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                   <FormButton type="submit" variant="primary" disabled={updating} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <Save size={16} />
-                    <span>{updating ? 'Saving...' : 'Save Profile Changes'}</span>
+                    <span>{updating ? 'Saving...' : 'Save Changes'}</span>
                   </FormButton>
                 </div>
               )}
@@ -310,8 +330,7 @@ export default function Profile() {
 
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <KeyRound size={18} style={{ color: 'var(--primary)' }} />
-              <span>Security & Password Controls</span>
+              <span>Change Password</span>
             </h3>
 
             <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -324,7 +343,6 @@ export default function Profile() {
                       type="password"
                       value={passwordData.currentPassword}
                       onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                      icon={KeyRound}
                       placeholder="••••••••"
                       required
                     />
@@ -361,7 +379,6 @@ export default function Profile() {
                       type="text"
                       value={passwordData.otp}
                       onChange={(e) => setPasswordData(prev => ({ ...prev, otp: e.target.value }))}
-                      icon={KeyRound}
                       placeholder="6-digit OTP code"
                       required
                     />
@@ -392,7 +409,6 @@ export default function Profile() {
                   type="password"
                   value={passwordData.newPassword}
                   onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                  icon={KeyRound}
                   placeholder="••••••••"
                   required
                 />
@@ -402,16 +418,13 @@ export default function Profile() {
                   type="password"
                   value={passwordData.confirmNewPassword}
                   onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-                  icon={KeyRound}
                   placeholder="••••••••"
                   required
                 />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-                <Save size={16} style={{ display: 'none' }} />
                 <FormButton type="submit" variant="primary" disabled={changingPassword} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <Save size={16} />
                   <span>{changingPassword ? 'Updating...' : 'Update Password'}</span>
                 </FormButton>
               </div>

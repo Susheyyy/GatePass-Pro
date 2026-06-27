@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
-  ShieldCheck, 
-  CheckCircle, 
+import {  
   XCircle, 
   Clock, 
   Building, 
@@ -14,8 +12,7 @@ import {
   Send,
   X,
   Plus,
-  Key,
-  MapPin
+  Key
 } from 'lucide-react';
 import { residentApi, visitorApi } from '../services/api';
 import { FormButton, FormInput } from '../components/FormComponents';
@@ -247,7 +244,7 @@ export default function ResidentDashboard() {
               fontSize: '0.9rem',
               lineHeight: 1.5
             }}>
-              👋 The society manager has registered your account for <strong>Flat {resident.flatNo}</strong>. Please check and confirm if the details below are correct to complete verification.
+             The society manager has registered your account for <strong>Flat {resident.flatNo}</strong>. Please check and confirm if the details below are correct to complete verification.
             </div>
           ) : (
             <div style={{
@@ -276,7 +273,6 @@ export default function ResidentDashboard() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ padding: '10px', backgroundColor: 'var(--bg-main)', borderRadius: '10px', color: 'var(--text-muted)' }}>
-                <Building size={20} />
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase' }}>Flat No</div>
@@ -286,7 +282,6 @@ export default function ResidentDashboard() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ padding: '10px', backgroundColor: 'var(--bg-main)', borderRadius: '10px', color: 'var(--text-muted)' }}>
-                <User size={20} />
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase' }}>Full Name</div>
@@ -296,7 +291,6 @@ export default function ResidentDashboard() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ padding: '10px', backgroundColor: 'var(--bg-main)', borderRadius: '10px', color: 'var(--text-muted)' }}>
-                <Phone size={20} />
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase' }}>Mobile</div>
@@ -306,7 +300,6 @@ export default function ResidentDashboard() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ padding: '10px', backgroundColor: 'var(--bg-main)', borderRadius: '10px', color: 'var(--text-muted)' }}>
-                <Mail size={20} />
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase' }}>Email</div>
@@ -316,7 +309,6 @@ export default function ResidentDashboard() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ padding: '10px', backgroundColor: 'var(--bg-main)', borderRadius: '10px', color: 'var(--text-muted)' }}>
-                <Users size={20} />
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase' }}>Family Members</div>
@@ -374,11 +366,9 @@ export default function ResidentDashboard() {
         
         <div style={{ display: 'flex', gap: '12px' }}>
           <FormButton onClick={() => setIsMemberModalOpen(true)} variant="secondary">
-            <Users size={18} />
             <span>Add Co-Resident</span>
           </FormButton>
           <FormButton onClick={() => setIsPassModalOpen(true)} variant="primary">
-            <Plus size={18} />
             <span>Pre-Approve Visitor</span>
           </FormButton>
         </div>
@@ -437,7 +427,6 @@ export default function ResidentDashboard() {
 
       <div className="content-card">
         <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Users size={20} style={{ color: 'var(--primary)' }} />
           <span>Flat Members / Co-Residents ({flatMembers.length})</span>
         </h3>
         {flatMembers.length === 0 ? (
@@ -569,19 +558,23 @@ export default function ResidentDashboard() {
           backgroundColor: 'rgba(15, 23, 42, 0.4)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
-          justifyContent: 'flex-end',
-          zIndex: 1000
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
         }}>
           <div style={{
-            width: '100%',
-            maxWidth: '460px',
+            width: '90%',
+            maxWidth: '500px',
             backgroundColor: 'var(--bg-card)',
-            height: '100%',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
             padding: '36px',
             display: 'flex',
             flexDirection: 'column',
             gap: '24px',
-            overflowY: 'auto'
+            maxHeight: '90vh',
+            animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>Create Pre-Approved Pass</h3>
@@ -590,13 +583,12 @@ export default function ResidentDashboard() {
               </button>
             </div>
 
-            <form onSubmit={handleVisitorSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+            <form onSubmit={handleVisitorSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
               <FormInput
                 label="Visitor Full Name"
                 value={visitorForm.name}
                 onChange={(e) => setVisitorForm(prev => ({ ...prev, name: e.target.value }))}
-                icon={User}
-                placeholder="e.g. Rahul Sen"
+                placeholder="Enter Full Name"
                 required
               />
 
@@ -627,8 +619,7 @@ export default function ResidentDashboard() {
                 label="Mobile Number"
                 value={visitorForm.mobile}
                 onChange={(e) => setVisitorForm(prev => ({ ...prev, mobile: e.target.value }))}
-                icon={Phone}
-                placeholder="e.g. 9876543210"
+                placeholder="Enter phone number"
                 required
               />
 
@@ -655,19 +646,23 @@ export default function ResidentDashboard() {
           backgroundColor: 'rgba(15, 23, 42, 0.4)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
-          justifyContent: 'flex-end',
-          zIndex: 1000
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
         }}>
           <div style={{
-            width: '100%',
-            maxWidth: '460px',
+            width: '90%',
+            maxWidth: '500px',
             backgroundColor: 'var(--bg-card)',
-            height: '100%',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
             padding: '36px',
             display: 'flex',
             flexDirection: 'column',
             gap: '24px',
-            overflowY: 'auto'
+            maxHeight: '90vh',
+            animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>Add Co-Resident</h3>
@@ -676,13 +671,12 @@ export default function ResidentDashboard() {
               </button>
             </div>
 
-            <form onSubmit={handleMemberSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+            <form onSubmit={handleMemberSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
               <FormInput
                 label="Full Name"
                 value={memberForm.name}
                 onChange={(e) => setMemberForm(prev => ({ ...prev, name: e.target.value }))}
-                icon={User}
-                placeholder="e.g. Jane Doe"
+                placeholder="Enter full name"
                 required
               />
 
@@ -690,8 +684,7 @@ export default function ResidentDashboard() {
                 label="Mobile Number"
                 value={memberForm.mobile}
                 onChange={(e) => setMemberForm(prev => ({ ...prev, mobile: e.target.value }))}
-                icon={Phone}
-                placeholder="e.g. 9876543210"
+                placeholder="Enter phone number"
                 required
               />
 
@@ -699,8 +692,7 @@ export default function ResidentDashboard() {
                 label="Gmail Address"
                 value={memberForm.gmail}
                 onChange={(e) => setMemberForm(prev => ({ ...prev, gmail: e.target.value }))}
-                icon={Mail}
-                placeholder="e.g. jane.doe@gmail.com"
+                placeholder="Enter Gmail ID"
                 required
               />
 
@@ -751,17 +743,8 @@ export default function ResidentDashboard() {
               color: 'white'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{
-                  width: '8px',
-                  height: '8px',
-                  backgroundColor: 'var(--accent)',
-                  borderRadius: '50%',
-                  display: 'inline-block',
-                  boxShadow: '0 0 8px var(--accent)',
-                  animation: 'pulse 1.5s infinite'
-                }}></span>
                 <span style={{ fontSize: '0.9rem', fontWeight: '800' }}>
-                  Distress & Support Desk
+                  Contact Admin
                 </span>
                 {resident.distressStatus && resident.distressStatus !== 'None' && (
                   <span style={{
@@ -813,7 +796,7 @@ export default function ResidentDashboard() {
                   color: 'var(--text-muted)',
                   fontSize: '0.85rem'
                 }}>
-                  💬 Need help? Send a distress message directly to the society administration desk.
+                  Need help? Send a distress message directly to the society administration desk.
                 </div>
               ) : (
                 resident.distressMessages.map((msg, index) => {

@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
-  Plus, 
   Search, 
   Trash2, 
   Home, 
   User, 
   Phone, 
-  Clock, 
   MapPin, 
   Check, 
   LogOut, 
@@ -111,7 +109,7 @@ export default function Visitors() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em' }}>
-            Gate Entry & Visitor Desk
+Visitor Management 
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
             Manage current check-ins, approve visitor passcodes, and track society entry logs.
@@ -119,7 +117,6 @@ export default function Visitors() {
         </div>
         {userRole !== 'security' && (
           <FormButton onClick={() => setIsAddOpen(true)} variant="primary">
-            <Plus size={18} />
             <span>New Entry Pass</span>
           </FormButton>
         )}
@@ -285,35 +282,38 @@ export default function Visitors() {
           backgroundColor: 'rgba(15, 23, 42, 0.4)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
-          justifyContent: 'flex-end',
-          zIndex: 1000
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
         }}>
           <div style={{
-            width: '100%',
-            maxWidth: '460px',
+            width: '90%',
+            maxWidth: '500px',
             backgroundColor: 'var(--bg-card)',
-            height: '100%',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
             padding: '36px',
             display: 'flex',
             flexDirection: 'column',
             gap: '24px',
-            overflowY: 'auto'
+            maxHeight: '90vh',
+            animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>Register Walk-in Entry</h3>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>Check-in Details</h3>
               <button onClick={() => setIsAddOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleAddSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+            <form onSubmit={handleAddSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
               <FormInput
                 label="Visitor Full Name"
                 name="name"
-                placeholder="e.g. Amit Kumar"
+                placeholder="Enter full name"
                 value={formData.name}
                 onChange={handleInputChange}
-                icon={User}
                 required
               />
 
@@ -344,40 +344,36 @@ export default function Visitors() {
               <FormInput
                 label="Mobile Number"
                 name="mobile"
-                placeholder="e.g. 9876543210"
+                placeholder="Enter mobile number"
                 value={formData.mobile}
                 onChange={handleInputChange}
-                icon={Phone}
                 required
               />
 
               <FormInput
                 label="Destination Flat No"
                 name="flatNo"
-                placeholder="e.g. A-202"
+                placeholder="Enter flat number"
                 value={formData.flatNo}
                 onChange={handleInputChange}
-                icon={Home}
                 required
               />
 
               <FormInput
                 label="Purpose of Visit"
                 name="purpose"
-                placeholder="e.g. Meeting, Delivery, Maintenance"
+                placeholder="Enter purpose of visit"
                 value={formData.purpose}
                 onChange={handleInputChange}
-                icon={ShieldAlert}
                 required
               />
 
               <FormInput
                 label="Vehicle Number"
                 name="vehicleNumber"
-                placeholder="e.g. MH04AB1234"
+                placeholder="Enter vehicle number"
                 value={formData.vehicleNumber}
                 onChange={handleInputChange}
-                icon={MapPin}
               />
 
               <div style={{ display: 'flex', gap: '12px', marginTop: 'auto', paddingTop: '24px' }}>

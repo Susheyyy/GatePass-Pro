@@ -4,10 +4,8 @@ import {
   UserCheck,
   ShieldCheck,
   AlertTriangle,
-  Plus,
   FileText,
   Radio,
-  ArrowUpRight,
   Clock,
   MapPin,
   X
@@ -39,8 +37,8 @@ export default function Dashboard() {
 
         let pendingAlerts = 0;
         residents.forEach(r => {
-          if (r.distressMessages) {
-            pendingAlerts += r.distressMessages.length;
+          if (r.distressStatus === 'Active') {
+            pendingAlerts += 1;
           }
         });
 
