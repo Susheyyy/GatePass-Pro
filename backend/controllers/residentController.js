@@ -137,7 +137,14 @@ const updateResident = async (req, res) => {
     }
     
     if (currentPassword && newPassword) {
-      if (resident.password !== currentPassword) {
+      const bcrypt = require('bcryptjs');
+      let isMatch = false;
+      if (resident.password.startsWith('$2') || resident.password.length > 10) {
+        isMatch = await bcrypt.compare(currentPassword, resident.password);
+      } else {
+        isMatch = resident.password === currentPassword;
+      }
+      if (!isMatch) {
         return res.status(400).json({ message: 'Incorrect current password' });
       }
       resident.password = newPassword;

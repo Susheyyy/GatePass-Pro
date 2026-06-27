@@ -2,6 +2,18 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/residents';
 
+axios.interceptors.request.use((config) => {
+  const role = localStorage.getItem('gatepass_role') || 'resident';
+  const email = localStorage.getItem('gatepass_resident_email') || '';
+  const residentId = localStorage.getItem('gatepass_resident_id') || '';
+  config.headers['X-User-Role'] = role;
+  config.headers['X-User-Email'] = email;
+  config.headers['X-User-Resident-Id'] = residentId;
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 const DEFAULT_RESIDENTS = [];
 
 const getLocalResidents = () => {
