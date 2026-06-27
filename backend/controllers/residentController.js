@@ -39,7 +39,21 @@ const addResident = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    const existingGmail = await Resident.findOne({ gmail: gmail.toLowerCase() });
+    if (!/^[a-zA-Z]+-\d+$/.test(flatNo.trim())) {
+      return res.status(400).json({ message: 'Flat Number must be in Alphabet-number format (e.g. A-102)' });
+    }
+    if (!/^\d+$/.test(mobile.trim())) {
+      return res.status(400).json({ message: 'Mobile Number must contain only digits' });
+    }
+    if (!/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(gmail.trim())) {
+      return res.status(400).json({ message: 'Gmail Address must end with a standard provider (e.g. @gmail.com, @yahoo.com)' });
+    }
+    if (!/^\d+$/.test(members.toString().trim())) {
+      return res.status(400).json({ message: 'Total Family Members must contain only digits' });
+    }
+
+    const formattedGmail = gmail.trim().toLowerCase();
+    const existingGmail = await Resident.findOne({ gmail: formattedGmail });
     if (existingGmail) {
       return res.status(400).json({ message: 'A resident with this Gmail address already exists' });
     }
@@ -115,11 +129,33 @@ const updateResident = async (req, res) => {
       resident.isFirstLogin = false;
       resident.otp = '';
     } else {
+      if (flatNo && !/^[a-zA-Z]+-\d+$/.test(flatNo.trim())) {
+        return res.status(400).json({ message: 'Flat Number must be in Alphabet-number format (e.g. A-102)' });
+      }
+      if (mobile && !/^\d+$/.test(mobile.trim())) {
+        return res.status(400).json({ message: 'Mobile Number must contain only digits' });
+      }
+      if (gmail && !/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(gmail.trim())) {
+        return res.status(400).json({ message: 'Gmail Address must end with a standard provider (e.g. @gmail.com, @yahoo.com)' });
+      }
+      if (members !== undefined && !/^\d+$/.test(members.toString().trim())) {
+        return res.status(400).json({ message: 'Total Family Members must contain only digits' });
+      }
+
       resident.flatNo = flatNo || resident.flatNo;
       resident.name = name || resident.name;
       resident.mobile = mobile || resident.mobile;
-      resident.gmail = gmail || resident.gmail;
-      resident.members = members !== undefined ? members : resident.members;
+      if (gmail) {
+        const formattedGmail = gmail.trim().toLowerCase();
+        if (formattedGmail !== resident.gmail.trim().toLowerCase()) {
+          const existingGmail = await Resident.findOne({ gmail: formattedGmail });
+          if (existingGmail) {
+            return res.status(400).json({ message: 'A resident with this Gmail address already exists' });
+          }
+        }
+        resident.gmail = formattedGmail;
+      }
+      resident.members = members !== undefined ? (parseInt(members) || resident.members) : resident.members;
       resident.status = status || resident.status;
       resident.bio = bio !== undefined ? bio : resident.bio;
       resident.location = location !== undefined ? location : resident.location;
@@ -132,10 +168,7 @@ const updateResident = async (req, res) => {
         resident.distressMessages.push({
           message: distressMessage,
           sender: msgSender
-        });
-
-        // Trigger notification
-        try {
+        });        try {
           const Notification = require('../models/Notification');
           if (msgSender === 'admin') {
             await Notification.create({

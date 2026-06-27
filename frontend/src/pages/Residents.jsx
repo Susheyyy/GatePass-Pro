@@ -111,24 +111,50 @@ export default function Residents() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'members' ? parseInt(value) || 1 : value
+      [name]: value
     }));
   };
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
+    if (!/^[a-zA-Z]+-\d+$/.test(formData.flatNo.trim())) {
+      toast.warning('Flat Number must be in Alphabet-number format (e.g. A-102, B-405)');
+      return;
+    }
+    
+    if (!/^\d+$/.test(formData.mobile.trim())) {
+      toast.warning('Mobile Number must contain only digits');
+      return;
+    }
+    
+    if (!/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(formData.gmail.trim())) {
+      toast.warning('Gmail Address must end with a standard provider (e.g. @gmail.com, @yahoo.com)');
+      return;
+    }
+    
+    if (!/^\d+$/.test(formData.members.toString().trim())) {
+      toast.warning('Total Family Members must contain only digits');
+      return;
+    }
+
     try {
+      const submitData = {
+        ...formData,
+        members: parseInt(formData.members) || 1
+      };
       if (formMode === 'add') {
-        await residentApi.create(formData);
+        await residentApi.create(submitData);
         showNotification('New resident added successfully!');
       } else {
-        await residentApi.update(selectedResidentId, formData);
+        await residentApi.update(selectedResidentId, submitData);
         showNotification('Resident details updated successfully!');
       }
       setIsFormOpen(false);
       fetchResidents(searchQuery);
     } catch (err) {
-      setError('Operation failed. Please try again.');
+      setError(err.message || 'Operation failed. Please try again.');
     }
   };
 
@@ -559,12 +585,11 @@ export default function Residents() {
               <FormInput
                 label="Total Family Members"
                 name="members"
-                type="number"
+                type="text"
                 placeholder="Enter number of members"
                 value={formData.members}
                 onChange={handleInputChange}
                 icon={Users}
-                min={1}
                 required
               />
 

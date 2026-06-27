@@ -85,6 +85,14 @@ export const residentApi = {
       }
       console.warn('Backend offline, saving to LocalStorage:', error.message);
       const list = getLocalResidents();
+      const existingGmail = list.find(r => r.gmail.toLowerCase() === residentData.gmail.trim().toLowerCase());
+      if (existingGmail) {
+        throw new Error('A resident with this Gmail address already exists');
+      }
+      const existingFlat = list.find(r => r.flatNo.toLowerCase() === residentData.flatNo.trim().toLowerCase());
+      if (existingFlat) {
+        throw new Error('A resident is already registered for this flat');
+      }
       const firstName = residentData.name.trim().split(' ')[0].toLowerCase();
       const flatClean = residentData.flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
       const generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
@@ -123,6 +131,15 @@ export const residentApi = {
       const list = getLocalResidents();
       const index = list.findIndex(r => r._id === id);
       if (index !== -1) {
+        if (residentData.gmail) {
+          const formattedGmail = residentData.gmail.trim().toLowerCase();
+          if (formattedGmail !== list[index].gmail.trim().toLowerCase()) {
+            const existingGmail = list.find(r => r.gmail.toLowerCase() === formattedGmail);
+            if (existingGmail) {
+              throw new Error('A resident with this Gmail address already exists');
+            }
+          }
+        }
         if (residentData.currentPassword && residentData.newPassword) {
           if (list[index].password !== residentData.currentPassword) {
             throw new Error('Incorrect current password');
@@ -148,7 +165,6 @@ export const residentApi = {
               createdAt: new Date().toISOString(),
               _id: 'msg-' + Math.random().toString(36).substr(2, 9)
             });
-            // trigger local notification
             addLocalNotification({
               recipient: msgSender === 'admin' ? list[index].flatNo : 'admin',
               title: msgSender === 'admin' ? 'New Distress Response' : 'Distress Alert Received',

@@ -5,7 +5,6 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: true,
     index: true
-    // Can be 'all', 'admin', or specific flatNo e.g. 'A-102'
   },
   title: {
     type: String,

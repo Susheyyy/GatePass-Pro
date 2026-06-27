@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Phone, MapPin, Building, Shield, FileText, KeyRound, Save, Mail } from 'lucide-react';
+import { User, Phone, MapPin, Building, FileText, KeyRound, Save, Mail } from 'lucide-react';
 import { residentApi } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
@@ -16,48 +16,16 @@ export default function Profile() {
     mobile: '',
     gmail: ''
   });
+
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
+    otp: '',
     newPassword: '',
     confirmNewPassword: ''
   });
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-
-  const handlePasswordChange = async (e) => {
-    e.preventDefault();
-    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
-      toast.warning('New passwords do not match!');
-      return;
-    }
-    if (passwordData.newPassword.length < 6) {
-      toast.warning('Password must be at least 6 characters long.');
-      return;
-    }
-    setChangingPassword(true);
-    try {
-      if (userRole === 'admin') {
-        const currentAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
-        if (passwordData.currentPassword !== currentAdminPass) {
-          toast.error('Incorrect current password.');
-          setChangingPassword(false);
-          return;
-        }
-        localStorage.setItem('gatepass_admin_password', passwordData.newPassword);
-        toast.success('Admin password updated successfully!');
-      } else {
-        await residentApi.update(profile._id, {
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        });
-        toast.success('Password updated successfully!');
-      }
-      setPasswordData({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
-    } catch (err) {
-      toast.error(err.message || 'Failed to change password.');
-    } finally {
-      setChangingPassword(false);
-    }
-  };
 
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
   const residentId = localStorage.getItem('gatepass_resident_id');
@@ -93,6 +61,7 @@ export default function Profile() {
           }
           setProfile(matched);
           setFormData({
+            bio: matched.bio || 'Resident of GatePass Pro Community.',
             location: matched.location || 'GatePass Residency',
             address: matched.address || `Flat ${matched.flatNo}, GatePass Residency`,
             mobile: matched.mobile || '',
@@ -128,6 +97,68 @@ export default function Profile() {
     }
   };
 
+  const handleRequestOtp = async () => {
+    if (userRole === 'admin') {
+      toast.info('OTP reset not required for Administrator account.');
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      const emailToReset = profile.gmail || profile.email;
+      await residentApi.forgotPassword(emailToReset);
+      setOtpSent(true);
+      toast.success('Verification OTP has been sent to your Gmail address!');
+    } catch (err) {
+      toast.error(err.message || 'Failed to send OTP.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+      toast.warning('New passwords do not match!');
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      toast.warning('Password must be at least 6 characters long.');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      if (userRole === 'admin') {
+        const currentAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
+        if (passwordData.currentPassword !== currentAdminPass) {
+          toast.error('Incorrect current password.');
+          setChangingPassword(false);
+          return;
+        }
+        localStorage.setItem('gatepass_admin_password', passwordData.newPassword);
+        toast.success('Admin password updated successfully!');
+      } else {
+        if (otpSent && passwordData.otp) {
+          const emailToReset = profile.gmail || profile.email;
+          const updated = await residentApi.resetForgotPassword(emailToReset, passwordData.otp, passwordData.newPassword);
+          setProfile(updated);
+          toast.success('Password reset successfully using OTP!');
+          setOtpSent(false);
+        } else {
+          await residentApi.update(profile._id, {
+            currentPassword: passwordData.currentPassword,
+            newPassword: passwordData.newPassword
+          });
+          toast.success('Password updated successfully!');
+        }
+      }
+      setPasswordData({ currentPassword: '', otp: '', newPassword: '', confirmNewPassword: '' });
+    } catch (err) {
+      toast.error(err.message || 'Failed to change password.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'var(--text-muted)' }}>
@@ -149,186 +180,262 @@ export default function Profile() {
         </p>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '30px'
-      }}>
-        
-        <div className="content-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '40px 24px', textAlign: 'center' }}>
+      <div className="content-card" style={{ padding: '40px 30px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 2fr',
+          gap: '40px',
+          alignItems: 'start'
+        }} className="grid-cols-mobile">
+          
           <div style={{
-            width: '100px',
-            height: '100px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
-            color: 'white',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '2rem',
-            fontWeight: '800',
-            boxShadow: '0 8px 24px rgba(50, 11, 53, 0.15)'
-          }}>
-            {initials}
-          </div>
-
-          <div>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: 'var(--text-main)' }}>{profile.name}</h3>
-          </div>
-
-          {userRole !== 'admin' && formData.bio && (
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, fontStyle: 'italic' }}>
-              "{formData.bio}"
-            </p>
-          )}
-
-          <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Community ID</span>
-              <span style={{ fontWeight: '700', color: 'var(--accent)' }}>GP-{profile.communityId}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Gmail ID</span>
-              <span style={{ fontWeight: '600' }}>{profile.gmail || profile.email}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Sign-in User</span>
-              <span style={{ fontWeight: '600' }}>{profile.email}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="content-card" style={{ padding: '36px' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '24px' }}>
-            Profile Configuration Details
-          </h3>
-
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)' }}>Community Role</label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="text"
-                  value={userRole === 'admin' ? 'Community Administrator' : 'Resident'}
-                  disabled
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px 12px 42px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border)',
-                    fontSize: '0.9rem',
-                    backgroundColor: 'rgba(0,0,0,0.02)',
-                    color: 'var(--text-muted)',
-                    outline: 'none',
-                    fontFamily: 'var(--font-sans)'
-                  }}
-                />
-                <User size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-light)' }} />
-              </div>
+            gap: '24px',
+            textAlign: 'center',
+            borderRight: '1px solid var(--border)',
+            paddingRight: '40px'
+          }} className="profile-left-col">
+            <div style={{
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2.5rem',
+              fontWeight: '800',
+              boxShadow: '0 8px 24px rgba(50, 11, 53, 0.15)'
+            }}>
+              {initials}
             </div>
 
-            <FormInput
-              label="Bio"
-              value={formData.bio}
-              onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-              icon={FileText}
-              placeholder="e.g. Software engineer, Tower A"
-              disabled={userRole === 'admin'}
-            />
+            <div>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: 'var(--text-main)' }}>{profile.name}</h3>
+              <span style={{
+                display: 'inline-block',
+                marginTop: '6px',
+                padding: '4px 12px',
+                backgroundColor: 'var(--primary-light)',
+                color: 'var(--primary)',
+                fontWeight: '700',
+                fontSize: '0.75rem',
+                borderRadius: '12px'
+              }}>
+                {userRole === 'admin' ? 'Community Administrator' : 'Resident Member'}
+              </span>
+            </div>
 
-            <FormInput
-              label="Location"
-              value={formData.location}
-              onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-              icon={MapPin}
-              placeholder="e.g. Tower B, GatePass residency"
-              disabled={userRole === 'admin'}
-            />
-
-            <FormInput
-              label="Residency Address"
-              value={formData.address}
-              onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-              icon={Building}
-              placeholder="e.g. Flat A-202"
-              disabled={userRole === 'admin'}
-            />
-
-            <FormInput
-              label="Gmail ID"
-              value={formData.gmail}
-              onChange={(e) => setFormData(prev => ({ ...prev, gmail: e.target.value }))}
-              icon={Mail}
-              placeholder="e.g. rajesh@gmail.com"
-              disabled={true}
-            />
-
-            <FormInput
-              label="Phone Number"
-              value={formData.mobile}
-              onChange={(e) => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
-              icon={Phone}
-              placeholder="e.g. 9876543210"
-              disabled={true}
-            />
-
-            {userRole !== 'admin' && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                <FormButton type="submit" variant="primary" disabled={updating} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <Save size={16} />
-                  <span>{updating ? 'Saving...' : 'Save Profile Changes'}</span>
-                </FormButton>
-              </div>
+            {userRole !== 'admin' && formData.bio && (
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, fontStyle: 'italic' }}>
+                "{formData.bio}"
+              </p>
             )}
-          </form>
-        </div>
 
-        <div className="content-card" style={{ padding: '36px' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '24px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <KeyRound size={20} style={{ color: 'var(--primary)' }} />
-            <span>Update Account Password</span>
-          </h3>
-
-          <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <FormInput
-              label="Current Password"
-              type="password"
-              value={passwordData.currentPassword}
-              onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-              icon={KeyRound}
-              placeholder="••••••••"
-              required
-            />
-
-            <FormInput
-              label="New Password"
-              type="password"
-              value={passwordData.newPassword}
-              onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-              icon={KeyRound}
-              placeholder="••••••••"
-              required
-            />
-
-            <FormInput
-              label="Confirm New Password"
-              type="password"
-              value={passwordData.confirmNewPassword}
-              onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-              icon={KeyRound}
-              placeholder="••••••••"
-              required
-            />
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-              <FormButton type="submit" variant="primary" disabled={changingPassword} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <Save size={16} />
-                <span>{changingPassword ? 'Updating...' : 'Change Password'}</span>
-              </FormButton>
+            <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Community ID</span>
+                <span style={{ fontWeight: '700', color: 'var(--accent)' }}>GP-{profile.communityId}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Gmail ID</span>
+                <span style={{ fontWeight: '600' }}>{profile.gmail || profile.email}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Sign-in User</span>
+                <span style={{ fontWeight: '600' }}>{profile.email}</span>
+              </div>
             </div>
-          </form>
-        </div>
+          </div>
 
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+            
+
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <User size={18} style={{ color: 'var(--primary)' }} />
+                <span>Profile Details</span>
+              </h3>
+
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <FormInput
+                  label="Bio"
+                  value={formData.bio}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
+                  icon={FileText}
+                  placeholder="e.g. Software engineer, Tower A"
+                  disabled={userRole === 'admin'}
+                />
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
+                  <FormInput
+                    label="Location"
+                    value={formData.location}
+                    onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                    icon={MapPin}
+                    placeholder="e.g. Tower B, GatePass residency"
+                    disabled={userRole === 'admin'}
+                  />
+
+                  <FormInput
+                    label="Residency Address"
+                    value={formData.address}
+                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                    icon={Building}
+                    placeholder="e.g. Flat A-202"
+                    disabled={userRole === 'admin'}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
+                  <FormInput
+                    label="Gmail ID"
+                    value={formData.gmail}
+                    onChange={(e) => setFormData(prev => ({ ...prev, gmail: e.target.value }))}
+                    icon={Mail}
+                    placeholder="e.g. rajesh@gmail.com"
+                    disabled={true}
+                  />
+
+                  <FormInput
+                    label="Phone Number"
+                    value={formData.mobile}
+                    onChange={(e) => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
+                    icon={Phone}
+                    placeholder="e.g. 9876543210"
+                    disabled={true}
+                  />
+                </div>
+
+                {userRole !== 'admin' && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                    <FormButton type="submit" variant="primary" disabled={updating} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <Save size={16} />
+                      <span>{updating ? 'Saving...' : 'Save Profile Changes'}</span>
+                    </FormButton>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            <div style={{ height: '1px', backgroundColor: 'var(--border)' }}></div>
+
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <KeyRound size={18} style={{ color: 'var(--primary)' }} />
+                <span>Security & Password Controls</span>
+              </h3>
+
+              <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {!otpSent ? (
+                  <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end' }} className="grid-cols-mobile">
+                    <div style={{ flex: 1 }}>
+                      <FormInput
+                        label="Current Password"
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                        icon={KeyRound}
+                        placeholder="••••••••"
+                        required
+                      />
+                    </div>
+                    {userRole !== 'admin' && (
+                      <button
+                        type="button"
+                        onClick={handleRequestOtp}
+                        disabled={sendingOtp}
+                        style={{
+                          padding: '12px 20px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--border)',
+                          backgroundColor: 'var(--bg-main)',
+                          color: 'var(--accent)',
+                          fontWeight: '700',
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          marginBottom: '2px',
+                          transition: 'var(--transition)'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-light)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}
+                      >
+                        {sendingOtp ? 'Sending OTP...' : 'Forgot Password?'}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end' }} className="grid-cols-mobile">
+                    <div style={{ flex: 1 }}>
+                      <FormInput
+                        label="Enter OTP Verification Code"
+                        type="text"
+                        value={passwordData.otp}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, otp: e.target.value }))}
+                        icon={KeyRound}
+                        placeholder="6-digit OTP code"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOtpSent(false)}
+                      style={{
+                        padding: '12px 20px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'var(--bg-main)',
+                        color: 'var(--text-muted)',
+                        fontWeight: '700',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        marginBottom: '2px'
+                      }}
+                    >
+                      Use Current Password
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid-cols-mobile">
+                  <FormInput
+                    label="New Password"
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                    icon={KeyRound}
+                    placeholder="••••••••"
+                    required
+                  />
+
+                  <FormInput
+                    label="Confirm New Password"
+                    type="password"
+                    value={passwordData.confirmNewPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
+                    icon={KeyRound}
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                  <FormButton type="submit" variant="primary" disabled={changingPassword} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Save size={16} />
+                    <span>{changingPassword ? 'Updating...' : 'Update Password'}</span>
+                  </FormButton>
+                </div>
+              </form>
+            </div>
+
+          </div>
+
+        </div>
       </div>
     </div>
   );

@@ -441,3 +441,28 @@ body {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+.grid-cols-mobile {
+  transition: var(--transition);
+}
+
+@media (max-width: 768px) {
+  .grid-cols-mobile {
+    grid-template-columns: 1fr !important;
+  }
+  .profile-left-col {
+    border-right: none !important;
+    padding-right: 0 !important;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 12px;
+  }
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: var(--text-main) !important;
+}

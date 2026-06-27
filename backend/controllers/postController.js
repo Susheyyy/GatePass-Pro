@@ -21,8 +21,6 @@ const createPost = async (req, res) => {
       flatNo
     });
     const saved = await newPost.save();
-    
-    // Trigger notification
     try {
       await Notification.create({
         recipient: 'all',
@@ -53,8 +51,6 @@ const addComment = async (req, res) => {
     }
     post.comments.push({ text, authorName, flatNo });
     const saved = await post.save();
-
-    // Trigger notification
     try {
       const isSystemAdmin = flatNo === 'Admin' || authorName === 'System Admin' || authorName === 'System Administrator';
       await Notification.create({
