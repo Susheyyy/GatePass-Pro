@@ -17,6 +17,20 @@ const saveLocalResidents = (residents) => {
   localStorage.setItem('gatepass_residents', JSON.stringify(residents));
 };
 
+const addLocalNotification = (notification) => {
+  const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
+  const newNotif = {
+    ...notification,
+    _id: 'mock-notif-' + Math.random().toString(36).substr(2, 9),
+    isRead: false,
+    createdAt: new Date().toISOString()
+  };
+  list.push(newNotif);
+  localStorage.setItem('gatepass_notifications', JSON.stringify(list));
+  window.dispatchEvent(new Event('mock_notification_sent'));
+  return newNotif;
+};
+
 export const residentApi = {
   getAll: async (searchQuery = '') => {
     try {
@@ -84,7 +98,13 @@ export const residentApi = {
       const list = getLocalResidents();
       const index = list.findIndex(r => r._id === id);
       if (index !== -1) {
-        if (residentData.password && residentData.otp) {
+        if (residentData.currentPassword && residentData.newPassword) {
+          if (list[index].password !== residentData.currentPassword) {
+            throw new Error('Incorrect current password');
+          }
+          list[index].password = residentData.newPassword;
+          list[index].isFirstLogin = false;
+        } else if (residentData.password && residentData.otp) {
           if (list[index].otp !== residentData.otp) {
             throw new Error('Invalid verification OTP');
           }
@@ -96,10 +116,19 @@ export const residentApi = {
             if (!list[index].distressMessages) {
               list[index].distressMessages = [];
             }
+            const msgSender = residentData.sender || 'resident';
             list[index].distressMessages.push({
               message: residentData.distressMessage,
+              sender: msgSender,
               createdAt: new Date().toISOString(),
               _id: 'msg-' + Math.random().toString(36).substr(2, 9)
+            });
+            // trigger local notification
+            addLocalNotification({
+              recipient: msgSender === 'admin' ? list[index].flatNo : 'admin',
+              title: msgSender === 'admin' ? 'New Distress Response' : 'Distress Alert Received',
+              message: msgSender === 'admin' ? `Admin replied: "${residentData.distressMessage}"` : `${list[index].name} (Flat ${list[index].flatNo}) distress: "${residentData.distressMessage}"`,
+              type: 'distress_reply'
             });
           }
           list[index] = { ...list[index], ...residentData };
@@ -256,8 +285,20 @@ export const visitorApi = {
         const updated = { ...list[index], ...visitorData };
         if (visitorData.status === 'Checked In') {
           updated.checkedInAt = new Date().toISOString();
+          addLocalNotification({
+            recipient: updated.flatNo,
+            title: 'Visitor Checked In',
+            message: `${updated.name} (${updated.type}) has checked in to your flat.`,
+            type: 'visitor_checkin'
+          });
         } else if (visitorData.status === 'Checked Out') {
           updated.checkedOutAt = new Date().toISOString();
+          addLocalNotification({
+            recipient: updated.flatNo,
+            title: 'Visitor Checked Out',
+            message: `${updated.name} (${updated.type}) has checked out from your flat.`,
+            type: 'visitor_checkout'
+          });
         }
         list[index] = updated;
         saveLocalVisitors(list);
@@ -316,6 +357,12 @@ export const postApi = {
       };
       list.push(newPost);
       saveLocalPosts(list);
+      addLocalNotification({
+        recipient: 'all',
+        title: 'New Community Announcement',
+        message: `${newPost.authorName} (Flat ${newPost.flatNo}) posted: "${newPost.title}"`,
+        type: 'community'
+      });
       return newPost;
     }
   },
@@ -338,9 +385,85 @@ export const postApi = {
         };
         list[index].comments.push(newComment);
         saveLocalPosts(list);
+        const isSystemAdmin = commentData.flatNo === 'Admin' || commentData.authorName === 'System Admin' || commentData.authorName === 'System Administrator';
+        addLocalNotification({
+          recipient: isSystemAdmin ? 'all' : 'admin',
+          title: isSystemAdmin ? 'Admin Commented on Post' : 'New Comment on Post',
+          message: `${commentData.authorName} (${commentData.flatNo}): "${commentData.text}" on post "${list[index].title}"`,
+          type: 'community'
+        });
         return list[index];
       }
       throw new Error('Post not found in local storage');
+    }
+  }
+};
+
+const NOTIF_API_BASE_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/residents', '/notifications') : 'http://localhost:5000/api/notifications';
+
+export const notificationApi = {
+  getAll: async (role, flatNo) => {
+    try {
+      const response = await axios.get(NOTIF_API_BASE_URL, {
+        params: { role, flatNo }
+      });
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, using LocalStorage fallback for notifications:', error.message);
+      const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
+      const recipientValue = role === 'admin' ? 'admin' : flatNo;
+      return list.filter(n => n.recipient === 'all' || n.recipient === recipientValue)
+                 .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+  },
+  markAsRead: async (id) => {
+    try {
+      const response = await axios.put(`${NOTIF_API_BASE_URL}/${id}/read`);
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, marking notification read in LocalStorage:', error.message);
+      const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
+      const index = list.findIndex(n => n._id === id);
+      if (index !== -1) {
+        list[index].isRead = true;
+        localStorage.setItem('gatepass_notifications', JSON.stringify(list));
+        return list[index];
+      }
+      throw new Error('Notification not found');
+    }
+  },
+  clearAll: async (role, flatNo) => {
+    try {
+      await axios.delete(NOTIF_API_BASE_URL, {
+        params: { role, flatNo }
+      });
+      return { message: 'Notifications cleared successfully' };
+    } catch (error) {
+      console.warn('Backend offline, clearing notifications in LocalStorage:', error.message);
+      const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
+      const recipientValue = role === 'admin' ? 'admin' : flatNo;
+      const filtered = list.filter(n => n.recipient !== 'all' && n.recipient !== recipientValue);
+      localStorage.setItem('gatepass_notifications', JSON.stringify(filtered));
+      return { message: 'Notifications cleared successfully' };
+    }
+  },
+  createBroadcast: async (title, message) => {
+    try {
+      const response = await axios.post(NOTIF_API_BASE_URL, {
+        recipient: 'all',
+        title,
+        message,
+        type: 'admin_broadcast'
+      });
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, broadcasting in LocalStorage:', error.message);
+      return addLocalNotification({
+        recipient: 'all',
+        title,
+        message,
+        type: 'admin_broadcast'
+      });
     }
   }
 };

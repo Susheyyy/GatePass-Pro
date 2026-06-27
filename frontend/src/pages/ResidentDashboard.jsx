@@ -624,29 +624,32 @@ export default function ResidentDashboard() {
                   💬 Need help? Send a distress message directly to the society administration desk.
                 </div>
               ) : (
-                resident.distressMessages.map((msg, index) => (
-                  <div
-                    key={msg._id || index}
-                    style={{
-                      alignSelf: 'flex-end',
-                      maxWidth: '85%',
-                      backgroundColor: 'var(--primary-light)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '12px 12px 0 12px',
-                      padding: '10px 12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px'
-                    }}
-                  >
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', wordBreak: 'break-word' }}>
-                      {msg.message}
+                resident.distressMessages.map((msg, index) => {
+                  const isAdmin = msg.sender === 'admin';
+                  return (
+                    <div
+                      key={msg._id || index}
+                      style={{
+                        alignSelf: isAdmin ? 'flex-start' : 'flex-end',
+                        maxWidth: '85%',
+                        backgroundColor: isAdmin ? 'rgba(0,0,0,0.03)' : 'var(--primary-light)',
+                        border: isAdmin ? '1px solid var(--border)' : '1px solid var(--primary-border)',
+                        borderRadius: isAdmin ? '12px 12px 12px 0' : '12px 12px 0 12px',
+                        padding: '10px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', wordBreak: 'break-word', textAlign: 'left' }}>
+                        {msg.message}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

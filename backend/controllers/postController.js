@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Post = require('../models/Post');
+const Notification = require('../models/Notification');
 
 const getPosts = async (req, res) => {
   try {
@@ -20,6 +21,19 @@ const createPost = async (req, res) => {
       flatNo
     });
     const saved = await newPost.save();
+    
+    // Trigger notification
+    try {
+      await Notification.create({
+        recipient: 'all',
+        title: 'New Community Announcement',
+        message: `${authorName} (Flat ${flatNo}) posted: "${title}"`,
+        type: 'community'
+      });
+    } catch (err) {
+      console.error('Error creating notification:', err);
+    }
+
     res.status(201).json(saved);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -39,6 +53,20 @@ const addComment = async (req, res) => {
     }
     post.comments.push({ text, authorName, flatNo });
     const saved = await post.save();
+
+    // Trigger notification
+    try {
+      const isSystemAdmin = flatNo === 'Admin' || authorName === 'System Admin' || authorName === 'System Administrator';
+      await Notification.create({
+        recipient: isSystemAdmin ? 'all' : 'admin',
+        title: isSystemAdmin ? 'Admin Commented on Post' : 'New Comment on Post',
+        message: `${authorName} (${flatNo}): "${text.length > 50 ? text.substring(0, 50) + '...' : text}" on post "${post.title}"`,
+        type: 'community'
+      });
+    } catch (err) {
+      console.error('Error creating notification:', err);
+    }
+
     res.status(201).json(saved);
   } catch (error) {
     res.status(400).json({ message: error.message });

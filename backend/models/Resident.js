@@ -51,6 +51,7 @@ const residentSchema = new mongoose.Schema({
   },
   distressMessages: [{
     message: { type: String, required: true },
+    sender: { type: String, default: 'resident' },
     createdAt: { type: Date, default: Date.now }
   }],
   communityId: {

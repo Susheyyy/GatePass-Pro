@@ -16,6 +16,48 @@ export default function Profile() {
     mobile: '',
     gmail: ''
   });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: ''
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+      toast.warning('New passwords do not match!');
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      toast.warning('Password must be at least 6 characters long.');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      if (userRole === 'admin') {
+        const currentAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
+        if (passwordData.currentPassword !== currentAdminPass) {
+          toast.error('Incorrect current password.');
+          setChangingPassword(false);
+          return;
+        }
+        localStorage.setItem('gatepass_admin_password', passwordData.newPassword);
+        toast.success('Admin password updated successfully!');
+      } else {
+        await residentApi.update(profile._id, {
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        });
+        toast.success('Password updated successfully!');
+      }
+      setPasswordData({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+    } catch (err) {
+      toast.error(err.message || 'Failed to change password.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
   const residentId = localStorage.getItem('gatepass_resident_id');
@@ -238,6 +280,52 @@ export default function Profile() {
                 </FormButton>
               </div>
             )}
+          </form>
+        </div>
+
+        <div className="content-card" style={{ padding: '36px' }}>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '24px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <KeyRound size={20} style={{ color: 'var(--primary)' }} />
+            <span>Update Account Password</span>
+          </h3>
+
+          <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <FormInput
+              label="Current Password"
+              type="password"
+              value={passwordData.currentPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+              icon={KeyRound}
+              placeholder="••••••••"
+              required
+            />
+
+            <FormInput
+              label="New Password"
+              type="password"
+              value={passwordData.newPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+              icon={KeyRound}
+              placeholder="••••••••"
+              required
+            />
+
+            <FormInput
+              label="Confirm New Password"
+              type="password"
+              value={passwordData.confirmNewPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
+              icon={KeyRound}
+              placeholder="••••••••"
+              required
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+              <FormButton type="submit" variant="primary" disabled={changingPassword} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <Save size={16} />
+                <span>{changingPassword ? 'Updating...' : 'Change Password'}</span>
+              </FormButton>
+            </div>
           </form>
         </div>
 

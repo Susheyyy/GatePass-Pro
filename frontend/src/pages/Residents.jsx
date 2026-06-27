@@ -34,6 +34,8 @@ export default function Residents() {
 
   const [selectedDistressResident, setSelectedDistressResident] = useState(null);
   const [isDistressOpen, setIsDistressOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState('add'); 
@@ -714,35 +716,89 @@ export default function Residents() {
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              maxHeight: '300px',
+              maxHeight: '260px',
               overflowY: 'auto',
               padding: '8px'
             }}>
-              {selectedDistressResident.distressMessages.map((msg, index) => (
-                <div 
-                  key={msg._id || index}
-                  style={{
-                    backgroundColor: 'rgba(244, 63, 94, 0.05)',
-                    border: '1px solid rgba(244, 63, 94, 0.15)',
-                    borderRadius: '12px',
-                    padding: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px'
-                  }}
-                >
-                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: '500' }}>
-                    {msg.message}
+              {selectedDistressResident.distressMessages.map((msg, index) => {
+                const isAdmin = msg.sender === 'admin';
+                return (
+                  <div
+                    key={msg._id || index}
+                    style={{
+                      alignSelf: isAdmin ? 'flex-end' : 'flex-start',
+                      width: '85%',
+                      backgroundColor: isAdmin ? 'var(--primary-light)' : 'rgba(244, 63, 94, 0.05)',
+                      border: isAdmin ? '1px solid var(--primary-border)' : '1px solid rgba(244, 63, 94, 0.15)',
+                      borderRadius: isAdmin ? '12px 12px 0 12px' : '12px 12px 12px 0',
+                      padding: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                  >
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: '500', textAlign: 'left' }}>
+                      {msg.message}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                      {new Date(msg.createdAt).toLocaleString()}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                    {new Date(msg.createdAt).toLocaleString()}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!replyText.trim() || sendingReply) return;
+                setSendingReply(true);
+                try {
+                  const updated = await residentApi.update(selectedDistressResident._id, {
+                    distressMessage: replyText.trim(),
+                    sender: 'admin'
+                  });
+                  setResidents(prev => prev.map(r => r._id === selectedDistressResident._id ? updated : r));
+                  setSelectedDistressResident(updated);
+                  setReplyText('');
+                  toast.success('Reply sent successfully!');
+                } catch (err) {
+                  toast.error('Failed to send reply.');
+                } finally {
+                  setSendingReply(false);
+                }
+              }}
+              style={{
+                display: 'flex',
+                gap: '8px',
+                borderTop: '1px solid var(--border)',
+                paddingTop: '16px'
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Type reply message..."
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  fontFamily: 'var(--font-sans)',
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--text-main)'
+                }}
+              />
+              <FormButton type="submit" variant="primary" disabled={!replyText.trim() || sendingReply} style={{ padding: '10px 20px' }}>
+                Reply
+              </FormButton>
+            </form>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-              <FormButton 
+              <FormButton
                 onClick={async () => {
                   try {
                     const updated = await residentApi.update(selectedDistressResident._id, { clearDistress: true });
@@ -754,12 +810,12 @@ export default function Residents() {
                     toast.error('Failed to resolve distress alerts.');
                   }
                 }}
-                variant="primary"
+                variant="success"
               >
                 Mark as Resolved
               </FormButton>
-              <FormButton 
-                onClick={() => { setIsDistressOpen(false); setSelectedDistressResident(null); }} 
+              <FormButton
+                onClick={() => { setIsDistressOpen(false); setSelectedDistressResident(null); }}
                 variant="secondary"
               >
                 Close Desk

@@ -9,11 +9,14 @@ import {
   Radio,
   ArrowUpRight,
   Clock,
-  MapPin
+  MapPin,
+  X
 } from 'lucide-react';
-import { residentApi, visitorApi } from '../services/api';
+import { residentApi, visitorApi, notificationApi } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export default function Dashboard() {
+  const toast = useToast();
   const [data, setData] = useState({
     activeVisitors: 0,
     totalResidents: 0,
@@ -21,6 +24,10 @@ export default function Dashboard() {
     recentVisitors: []
   });
   const [loading, setLoading] = useState(true);
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('Gate Security Broadcast');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [sendingAlert, setSendingAlert] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -257,13 +264,18 @@ export default function Dashboard() {
                 </div>
               </button>
 
-              <button className="btn-global" style={{
-                justifyContent: 'flex-start',
-                backgroundColor: 'var(--accent-light)',
-                color: 'var(--accent)',
-                border: '1px solid rgba(244, 63, 94, 0.15)',
-                width: '100%'
-              }}>
+              <button
+                onClick={() => setIsAlertModalOpen(true)}
+                className="btn-global"
+                style={{
+                  justifyContent: 'flex-start',
+                  backgroundColor: 'var(--accent-light)',
+                  color: 'var(--accent)',
+                  border: '1px solid rgba(244, 63, 94, 0.15)',
+                  width: '100%',
+                  cursor: 'pointer'
+                }}
+              >
                 <Radio size={18} />
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>Send Gate Alert</div>
@@ -276,6 +288,161 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {isAlertModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}>
+          <div className="content-card" style={{
+            width: '100%',
+            maxWidth: '500px',
+            padding: '30px',
+            position: 'relative',
+            boxShadow: 'var(--shadow-premium)',
+            animation: 'fadeInUp 0.25s ease-out'
+          }}>
+            <button
+              onClick={() => setIsAlertModalOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+                padding: '4px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.02)'
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Radio size={20} style={{ color: 'var(--accent)' }} />
+              <span>Broadcast Gate Alert</span>
+            </h3>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!alertMessage.trim() || sendingAlert) return;
+                setSendingAlert(true);
+                try {
+                  await notificationApi.createBroadcast(alertTitle, alertMessage.trim());
+                  toast.success('Gate Alert broadcasted successfully!');
+                  setAlertMessage('');
+                  setIsAlertModalOpen(false);
+                } catch (err) {
+                  toast.error('Failed to broadcast Gate Alert.');
+                } finally {
+                  setSendingAlert(false);
+                }
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>
+                  Alert Title
+                </label>
+                <input
+                  type="text"
+                  value={alertTitle}
+                  onChange={(e) => setAlertTitle(e.target.value)}
+                  required
+                  placeholder="e.g. Gate Security Broadcast"
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-main)',
+                    fontSize: '0.9rem',
+                    fontFamily: 'var(--font-sans)',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>
+                  Broadcast Message Details <span style={{ color: 'var(--accent)' }}>*</span>
+                </label>
+                <textarea
+                  placeholder="Type the message to send to all residents and guard logs..."
+                  value={alertMessage}
+                  onChange={(e) => setAlertMessage(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    minHeight: '100px',
+                    padding: '12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-main)',
+                    fontSize: '0.9rem',
+                    fontFamily: 'var(--font-sans)',
+                    outline: 'none',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAlertModalOpen(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    color: 'var(--text-muted)'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!alertMessage.trim() || sendingAlert}
+                  style={{
+                    padding: '8px 24px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: 'var(--accent)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    opacity: alertMessage.trim() ? 1 : 0.6
+                  }}
+                >
+                  {sendingAlert ? 'Sending...' : 'Broadcast'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

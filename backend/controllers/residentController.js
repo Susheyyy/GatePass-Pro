@@ -94,14 +94,20 @@ const addResident = async (req, res) => {
 
 const updateResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage, bio, location, address, clearDistress } = req.body;
+    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage, sender, bio, location, address, clearDistress, currentPassword, newPassword } = req.body;
     const resident = await Resident.findById(req.params.id);
     
     if (!resident) {
       return res.status(404).json({ message: 'Resident not found' });
     }
     
-    if (password && otp) {
+    if (currentPassword && newPassword) {
+      if (resident.password !== currentPassword) {
+        return res.status(400).json({ message: 'Incorrect current password' });
+      }
+      resident.password = newPassword;
+      resident.isFirstLogin = false;
+    } else if (password && otp) {
       if (resident.otp !== otp) {
         return res.status(400).json({ message: 'Invalid verification OTP' });
       }
@@ -122,7 +128,33 @@ const updateResident = async (req, res) => {
         resident.distressMessages = [];
       }
       if (distressMessage) {
-        resident.distressMessages.push({ message: distressMessage });
+        const msgSender = sender || 'resident';
+        resident.distressMessages.push({
+          message: distressMessage,
+          sender: msgSender
+        });
+
+        // Trigger notification
+        try {
+          const Notification = require('../models/Notification');
+          if (msgSender === 'admin') {
+            await Notification.create({
+              recipient: resident.flatNo,
+              title: 'New Distress Response',
+              message: `Admin replied: "${distressMessage.length > 50 ? distressMessage.substring(0, 50) + '...' : distressMessage}"`,
+              type: 'distress_reply'
+            });
+          } else {
+            await Notification.create({
+              recipient: 'admin',
+              title: 'Distress Alert Received',
+              message: `${resident.name} (Flat ${resident.flatNo}) distress: "${distressMessage.length > 50 ? distressMessage.substring(0, 50) + '...' : distressMessage}"`,
+              type: 'distress_reply'
+            });
+          }
+        } catch (err) {
+          console.error('Error creating distress notification:', err);
+        }
       }
     }
     

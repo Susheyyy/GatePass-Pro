@@ -1,9 +1,14 @@
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, LogOut, Shield, Bell, CheckCircle2, User, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, LogOut, Shield, Bell, CheckCircle2, User, MessageSquare, Trash2 } from 'lucide-react';
+import { notificationApi, residentApi } from '../services/api';
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [flatNo, setFlatNo] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('gatepass_token');
@@ -15,6 +20,46 @@ export default function Layout({ children }) {
 
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
   const residentEmail = localStorage.getItem('gatepass_resident_email') || '';
+
+  useEffect(() => {
+    if (userRole === 'resident' && residentEmail) {
+      const getFlat = async () => {
+        try {
+          const list = await residentApi.getAll();
+          const matched = list.find(r => r.email.toLowerCase() === residentEmail.toLowerCase());
+          if (matched) {
+            setFlatNo(matched.flatNo);
+          }
+        } catch (err) {
+          console.error('Error fetching flat number:', err);
+        }
+      };
+      getFlat();
+    }
+  }, [userRole, residentEmail]);
+
+  const fetchNotifications = async () => {
+    try {
+      const list = await notificationApi.getAll(userRole, userRole === 'admin' ? '' : flatNo);
+      setNotifications(list);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (userRole === 'admin' || (userRole === 'resident' && flatNo)) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 8000);
+      window.addEventListener('mock_notification_sent', fetchNotifications);
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('mock_notification_sent', fetchNotifications);
+      };
+    }
+  }, [userRole, flatNo]);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const navItems = userRole === 'admin'
     ? [
@@ -44,27 +89,162 @@ export default function Layout({ children }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <button style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: 'var(--text-muted)', 
-            cursor: 'pointer', 
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <Bell size={20} />
-            <span style={{ 
-              position: 'absolute', 
-              top: '-2px', 
-              right: '-2px', 
-              width: '8px', 
-              height: '8px', 
-              backgroundColor: 'var(--accent)', 
-              borderRadius: '50%',
-              border: '2px solid white'
-            }}></span>
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '6px',
+                borderRadius: '50%',
+                transition: 'var(--transition)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.03)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  backgroundColor: 'var(--accent)',
+                  color: 'white',
+                  fontSize: '0.65rem',
+                  fontWeight: '800',
+                  borderRadius: '50%',
+                  width: '16px',
+                  height: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid var(--bg-card)'
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {isNotificationOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '40px',
+                right: '0',
+                width: '320px',
+                maxHeight: '400px',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                boxShadow: 'var(--shadow-premium)',
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                animation: 'fadeInUp 0.2s ease-out'
+              }}>
+                <div style={{
+                  padding: '12px 16px',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.02)'
+                }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--text-main)' }}>Notifications</span>
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await notificationApi.clearAll(userRole, flatNo);
+                          setNotifications([]);
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent)',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Trash2 size={12} />
+                      <span>Clear All</span>
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      No notifications yet
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n._id}
+                        onClick={async () => {
+                          if (!n.isRead) {
+                            try {
+                              await notificationApi.markAsRead(n._id);
+                              setNotifications(prev => prev.map(item => item._id === n._id ? { ...item, isRead: true } : item));
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          gap: '10px',
+                          backgroundColor: n.isRead ? 'transparent' : 'rgba(99, 102, 241, 0.03)',
+                          transition: 'var(--transition)'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.02)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = n.isRead ? 'transparent' : 'rgba(99, 102, 241, 0.03)'}
+                      >
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          marginTop: '6px',
+                          backgroundColor:
+                            n.type === 'community' ? 'var(--primary)' :
+                            n.type === 'visitor_checkin' ? 'var(--success)' :
+                            n.type === 'visitor_checkout' ? 'var(--text-muted)' :
+                            n.type === 'distress_reply' ? 'var(--accent)' : '#f59e0b',
+                          flexShrink: 0
+                        }}></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: n.isRead ? '600' : '800', color: 'var(--text-main)' }}>
+                            {n.title}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.3' }}>
+                            {n.message}
+                          </span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-light)', marginTop: '2px' }}>
+                            {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           
           <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border)' }}></div>
 

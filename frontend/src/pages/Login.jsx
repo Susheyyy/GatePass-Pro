@@ -50,7 +50,8 @@ export default function Login() {
     }
 
     try {
-      if (formattedEmail === targetAdminEmail && password === targetAdminPassword) {
+      const currentAdminPassword = localStorage.getItem('gatepass_admin_password') || targetAdminPassword;
+      if (formattedEmail === targetAdminEmail && password === currentAdminPassword) {
         localStorage.setItem('gatepass_token', 'true');
         localStorage.setItem('gatepass_role', 'admin');
         localStorage.removeItem('gatepass_resident_id');

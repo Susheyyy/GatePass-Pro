@@ -54,8 +54,30 @@ const updateVisitor = async (req, res) => {
       visitor.status = status;
       if (status === 'Checked In') {
         visitor.checkedInAt = new Date();
+        try {
+          const Notification = require('../models/Notification');
+          await Notification.create({
+            recipient: visitor.flatNo,
+            title: 'Visitor Checked In',
+            message: `${visitor.name} (${visitor.type}) has checked in to your flat.`,
+            type: 'visitor_checkin'
+          });
+        } catch (err) {
+          console.error('Failed to create check-in notification:', err);
+        }
       } else if (status === 'Checked Out') {
         visitor.checkedOutAt = new Date();
+        try {
+          const Notification = require('../models/Notification');
+          await Notification.create({
+            recipient: visitor.flatNo,
+            title: 'Visitor Checked Out',
+            message: `${visitor.name} (${visitor.type}) has checked out from your flat.`,
+            type: 'visitor_checkout'
+          });
+        } catch (err) {
+          console.error('Failed to create check-out notification:', err);
+        }
       }
     }
     const updatedVisitor = await visitor.save();
