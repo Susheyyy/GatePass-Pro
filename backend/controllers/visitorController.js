@@ -154,7 +154,15 @@ const verifyPasscode = async (req, res) => {
       return res.status(403).json({ message: `Flat ${flatNo} is locked out. Try again in ${remainingTime} minutes.` });
     }
 
-    const visitor = await Visitor.findOne({ flatNo: new RegExp(`^${flatKey}$`, 'i'), passcode: passcode.trim() });
+    const visitors = await Visitor.find({ flatNo: new RegExp(`^${flatKey}$`, 'i') });
+    let visitor = null;
+    for (const v of visitors) {
+      const isMatch = await v.matchPasscode(passcode.trim());
+      if (isMatch) {
+        visitor = v;
+        break;
+      }
+    }
 
     if (!visitor) {
       const newCount = (attempts.count || 0) + 1;
