@@ -1,10 +1,9 @@
 const Visitor = require('../models/Visitor');
-
-const failedAttempts = {};
+const FailedAttempt = require('../models/FailedAttempt');
 
 const getVisitors = async (req, res) => {
   try {
-    const { flatNo, search } = req.query;
+    const { flatNo, search, page = 1, limit = 50 } = req.query;
     let query = {};
     if (flatNo) {
       query.flatNo = flatNo;
@@ -19,8 +18,19 @@ const getVisitors = async (req, res) => {
         { passcode: searchRegex }
       ];
     }
-    const visitors = await Visitor.find(query).sort({ createdAt: -1 });
-    res.status(200).json(visitors);
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+    const [visitors, total] = await Promise.all([
+      Visitor.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+      Visitor.countDocuments(query)
+    ]);
+    res.status(200).json({
+      visitors,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum)
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -137,29 +147,27 @@ const verifyPasscode = async (req, res) => {
     }
 
     const flatKey = flatNo.trim().toUpperCase();
-    const attempts = failedAttempts[flatKey] || { count: 0, lockUntil: null };
+    const attempts = await FailedAttempt.findOne({ flatNo: flatKey }) || { count: 0, lockedUntil: null };
 
-    if (attempts.lockUntil && attempts.lockUntil > new Date()) {
-      const remainingTime = Math.ceil((attempts.lockUntil - new Date()) / 1000 / 60);
+    if (attempts.lockedUntil && attempts.lockedUntil > new Date()) {
+      const remainingTime = Math.ceil((attempts.lockedUntil - new Date()) / 1000 / 60);
       return res.status(403).json({ message: `Flat ${flatNo} is locked out. Try again in ${remainingTime} minutes.` });
     }
 
     const visitor = await Visitor.findOne({ flatNo: new RegExp(`^${flatKey}$`, 'i'), passcode: passcode.trim() });
 
     if (!visitor) {
-      attempts.count += 1;
-      if (attempts.count >= 3) {
-        attempts.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
-        failedAttempts[flatKey] = attempts;
+      const newCount = (attempts.count || 0) + 1;
+      const locked = newCount >= 3;
+      await FailedAttempt.findOneAndUpdate(
+        { flatNo: flatKey },
+        { count: newCount, lockedUntil: locked ? new Date(Date.now() + 15 * 60 * 1000) : null },
+        { upsert: true, new: true }
+      );
+      if (locked) {
         return res.status(403).json({ message: `Too many invalid attempts. Flat ${flatNo} is locked out for 15 minutes.` });
       }
-      failedAttempts[flatKey] = attempts;
-      return res.status(400).json({ message: `Invalid passcode. Attempts remaining for flat: ${3 - attempts.count}` });
-    }
-
-    if (attempts.lockUntil && attempts.lockUntil <= new Date()) {
-      attempts.count = 0;
-      attempts.lockUntil = null;
+      return res.status(400).json({ message: `Invalid passcode. Attempts remaining for flat: ${3 - newCount}` });
     }
 
     if (visitor.status === 'Checked In' || visitor.status === 'Checked Out') {
@@ -171,7 +179,7 @@ const verifyPasscode = async (req, res) => {
       return res.status(400).json({ message: 'This passcode has expired.' });
     }
 
-    failedAttempts[flatKey] = { count: 0, lockUntil: null };
+    await FailedAttempt.findOneAndDelete({ flatNo: flatKey });
 
     visitor.status = 'Checked In';
     visitor.checkedInAt = new Date();

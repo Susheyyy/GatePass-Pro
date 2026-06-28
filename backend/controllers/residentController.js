@@ -13,9 +13,9 @@ const transporter = nodemailer.createTransport({
 
 const getResidents = async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page = 1, limit = 50 } = req.query;
     let query = {};
-    
+
     if (search) {
       const searchRegex = new RegExp(search, 'i');
       query.$or = [
@@ -24,9 +24,20 @@ const getResidents = async (req, res) => {
         { vehicles: searchRegex }
       ];
     }
-    
-    const residents = await Resident.find(query).select('-password').sort({ createdAt: -1 });
-    res.status(200).json(residents);
+
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+    const [residents, total] = await Promise.all([
+      Resident.find(query).select('-password').sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+      Resident.countDocuments(query)
+    ]);
+    res.status(200).json({
+      residents,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum)
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

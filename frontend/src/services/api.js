@@ -138,7 +138,7 @@ export const residentApi = {
       const response = await axios.get(`${API_BASE_URL}`, {
         params: { search: searchQuery }
       });
-      return response.data;
+      return response.data.residents ?? response.data;
     } catch (error) {
       console.warn('Backend offline, using LocalStorage fallback:', error.message);
       let list = getLocalResidents();
@@ -385,7 +385,7 @@ export const visitorApi = {
   getAll: async (params = {}) => {
     try {
       const response = await axios.get(VISITOR_API_BASE_URL, { params });
-      return response.data;
+      return response.data.visitors ?? response.data;
     } catch (error) {
       console.warn('Backend offline, using LocalStorage fallback for visitors:', error.message);
       let list = getLocalVisitors();
