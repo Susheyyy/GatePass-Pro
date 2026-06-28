@@ -41,6 +41,9 @@ const residentSchema = new mongoose.Schema({
   otp: {
     type: String
   },
+  otpExpiresAt: {
+    type: Date
+  },
   password: {
     type: String,
     default: 'resident123'

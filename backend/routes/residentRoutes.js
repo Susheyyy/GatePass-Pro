@@ -12,13 +12,15 @@ const {
   bulkCreateResidents
 } = require('../controllers/residentController');
 
+const { loginLimiter } = require('../middleware/visitorLimiter');
+
 router.route('/')
   .get(getResidents)
   .post(addResident);
 
 router.post('/bulk', bulkCreateResidents);
-router.post('/login', loginResident);
-router.post('/forgot-password', forgotPassword);
+router.post('/login', loginLimiter, loginResident);
+router.post('/forgot-password', loginLimiter, forgotPassword);
 router.post('/reset-password', resetForgotPassword);
 
 router.route('/:id')

@@ -88,6 +88,7 @@ const addResident = async (req, res) => {
       gmail,
       members,
       otp: generatedOtp,
+      otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
       password: 'resident123',
       isFirstLogin: true,
       communityId: generatedCommunityId,
@@ -139,12 +140,7 @@ const updateResident = async (req, res) => {
     
     if (currentPassword && newPassword) {
       const bcrypt = require('bcryptjs');
-      let isMatch = false;
-      if (resident.password.startsWith('$2') || resident.password.length > 10) {
-        isMatch = await bcrypt.compare(currentPassword, resident.password);
-      } else {
-        isMatch = resident.password === currentPassword;
-      }
+      const isMatch = await bcrypt.compare(currentPassword, resident.password);
       if (!isMatch) {
         return res.status(400).json({ message: 'Incorrect current password' });
       }
@@ -154,9 +150,13 @@ const updateResident = async (req, res) => {
       if (resident.otp !== otp) {
         return res.status(400).json({ message: 'Invalid verification OTP' });
       }
+      if (resident.otpExpiresAt && resident.otpExpiresAt < new Date()) {
+        return res.status(400).json({ message: 'Verification OTP has expired. Please request a new one.' });
+      }
       resident.password = password;
       resident.isFirstLogin = false;
       resident.otp = '';
+      resident.otpExpiresAt = null;
     } else {
       if (flatNo && !/^[a-zA-Z]+-\d+$/.test(flatNo.trim())) {
         return res.status(400).json({ message: 'Flat Number must be in Alphabet-number format (e.g. A-102)' });
@@ -313,6 +313,7 @@ const resendOtp = async (req, res) => {
     }
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     resident.otp = generatedOtp;
+    resident.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await resident.save();
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -355,6 +356,7 @@ const forgotPassword = async (req, res) => {
     }
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     resident.otp = generatedOtp;
+    resident.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await resident.save();
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -398,9 +400,13 @@ const resetForgotPassword = async (req, res) => {
     if (resident.otp !== otp.trim()) {
       return res.status(400).json({ message: 'Invalid verification OTP' });
     }
+    if (resident.otpExpiresAt && resident.otpExpiresAt < new Date()) {
+      return res.status(400).json({ message: 'Verification OTP has expired. Please request a new one.' });
+    }
     resident.password = password;
     resident.isFirstLogin = false;
     resident.otp = '';
+    resident.otpExpiresAt = null;
     await resident.save();
     res.status(200).json(resident);
   } catch (error) {
@@ -435,12 +441,7 @@ const loginResident = async (req, res) => {
     }
 
     const bcrypt = require('bcryptjs');
-    let isMatch = false;
-    if (resident.password.startsWith('$2') || resident.password.length > 10) {
-      isMatch = await bcrypt.compare(password, resident.password);
-    } else {
-      isMatch = resident.password === password;
-    }
+    const isMatch = await bcrypt.compare(password, resident.password);
 
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid password' });
