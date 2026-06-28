@@ -74,6 +74,10 @@ const residentSchema = new mongoose.Schema({
   address: {
     type: String,
     default: ''
+  },
+  vehicles: {
+    type: [String],
+    default: []
   }
 }, {
   timestamps: true
@@ -87,6 +91,6 @@ residentSchema.pre('save', async function() {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-residentSchema.index({ name: 'text', flatNo: 'text' });
+residentSchema.index({ name: 'text', flatNo: 'text', vehicles: 'text' });
 
 module.exports = mongoose.model('Resident', residentSchema);

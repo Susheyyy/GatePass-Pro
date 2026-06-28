@@ -20,7 +20,8 @@ const getResidents = async (req, res) => {
       const searchRegex = new RegExp(search, 'i');
       query.$or = [
         { name: searchRegex },
-        { flatNo: searchRegex }
+        { flatNo: searchRegex },
+        { vehicles: searchRegex }
       ];
     }
     
@@ -129,7 +130,7 @@ const addResident = async (req, res) => {
 
 const updateResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage, sender, bio, location, address, clearDistress, currentPassword, newPassword, distressStatus } = req.body;
+    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage, sender, bio, location, address, clearDistress, currentPassword, newPassword, distressStatus, vehicles } = req.body;
     const resident = await Resident.findById(req.params.id);
     
     if (!resident) {
@@ -207,6 +208,7 @@ const updateResident = async (req, res) => {
       resident.bio = bio !== undefined ? bio : resident.bio;
       resident.location = location !== undefined ? location : resident.location;
       resident.address = address !== undefined ? address : resident.address;
+      resident.vehicles = vehicles !== undefined ? vehicles : resident.vehicles;
       if (distressStatus && distressStatus !== resident.distressStatus) {
         resident.distressStatus = distressStatus;
         if (distressStatus === 'Resolved' || distressStatus === 'Dismissed') {

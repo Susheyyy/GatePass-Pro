@@ -7,6 +7,7 @@ import ResidentDashboard from './pages/ResidentDashboard';
 import Profile from './pages/Profile';
 import Community from './pages/Community';
 import Visitors from './pages/Visitors';
+import Vehicles from './pages/Vehicles';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastProvider } from './context/ToastContext';
@@ -66,6 +67,14 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <Profile />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/vehicles" element={
+          <ProtectedRoute>
+            <Layout>
+              <Vehicles />
             </Layout>
           </ProtectedRoute>
         } />

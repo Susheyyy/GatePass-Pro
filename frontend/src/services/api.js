@@ -114,6 +114,7 @@ export const residentApi = {
           bio: 'Resident of GatePass Pro Community.',
           location: 'GatePass Residency',
           address: `Flat ${r.flatNo}, GatePass Residency`,
+          vehicles: [],
           _id: 'mock-' + Math.random().toString(36).substr(2, 9),
           createdAt: new Date().toISOString()
         };
@@ -193,6 +194,7 @@ export const residentApi = {
         bio: 'Resident of GatePass Pro Community.',
         location: 'GatePass Residency',
         address: `Flat ${residentData.flatNo}, GatePass Residency`,
+        vehicles: residentData.vehicles || [],
         _id: 'mock-' + Math.random().toString(36).substr(2, 9),
         createdAt: new Date().toISOString()
       };
