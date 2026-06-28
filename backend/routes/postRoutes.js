@@ -1,12 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { getPosts, createPost, addComment } = require('../controllers/postController');
+const { getPosts, createPost, addComment, deletePost } = require('../controllers/postController');
+const { protectRoute } = require('../middleware/authMiddleware');
 
 router.route('/')
-  .get(getPosts)
-  .post(createPost);
+  .get(protectRoute, getPosts)
+  .post(protectRoute, createPost);
+
+router.route('/:id')
+  .delete(protectRoute, deletePost);
 
 router.route('/:id/comments')
-  .post(addComment);
+  .post(protectRoute, addComment);
 
 module.exports = router;

@@ -35,15 +35,32 @@ app.use((req, res, next) => {
   next();
 });
 
+const jwt = require('jsonwebtoken');
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    return next(new Error('Authentication required'));
+  }
+  const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+    socket.user = decoded;
+    next();
+  } catch (err) {
+    next(new Error('Invalid or expired token'));
+  }
+});
+
 io.on('connection', (socket) => {
   socket.on('join_room', (data) => {
-    const { role, flatNo } = data;
+    const role = socket.user.role;
     if (role === 'admin') {
       socket.join('room_admins');
     } else if (role === 'security') {
       socket.join('room_security');
-    } else if (role === 'resident' && flatNo) {
-      const roomName = `room_flat_${flatNo.toUpperCase().trim()}`;
+    } else if (role === 'resident' && socket.user.flatNo) {
+      const roomName = `room_flat_${socket.user.flatNo.toUpperCase().trim()}`;
       socket.join(roomName);
     }
   });

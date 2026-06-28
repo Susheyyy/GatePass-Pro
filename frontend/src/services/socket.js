@@ -11,11 +11,16 @@ export const connectSocket = (role, flatNo) => {
     socket.disconnect();
   }
 
+  const token = localStorage.getItem('gatepass_token');
+
   socket = io(SOCKET_URL, {
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000
+    reconnectionDelay: 1000,
+    auth: {
+      token
+    }
   });
 
   socket.on('connect', () => {

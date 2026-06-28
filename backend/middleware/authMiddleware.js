@@ -1,27 +1,41 @@
 const Resident = require('../models/Resident');
 const Visitor = require('../models/Visitor');
 
+const jwt = require('jsonwebtoken');
+
 const protectRoute = async (req, res, next) => {
   try {
-    const role = req.headers['x-user-role'] || 'resident';
-    const email = req.headers['x-user-email'];
-    
-    req.user = { role, email };
-
-    if (role === 'admin' || role === 'security') {
-      return next();
-    }
-
-    if (!email) {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    // Find the resident flat number
-    const resident = await Resident.findOne({ email });
+    const token = authHeader.split(' ')[1];
+    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, jwtSecret);
+    } catch (err) {
+      return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+
+    req.user = {
+      role: decoded.role,
+      email: decoded.email,
+      residentId: decoded.residentId,
+      flatNo: decoded.flatNo
+    };
+
+    if (decoded.role === 'admin' || decoded.role === 'security') {
+      return next();
+    }
+
+    const resident = await Resident.findOne({ email: decoded.email });
     if (!resident) {
       return res.status(401).json({ message: 'Resident account not found' });
     }
-    
+
     req.user.flatNo = resident.flatNo;
     req.user.residentId = resident._id;
     next();

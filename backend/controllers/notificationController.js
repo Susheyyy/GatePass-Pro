@@ -6,6 +6,12 @@ const getNotifications = async (req, res) => {
     if (!role) {
       return res.status(400).json({ message: 'Role is required' });
     }
+    if (req.user.role !== 'admin' && req.user.role !== role) {
+      return res.status(403).json({ message: 'Forbidden: Role mismatch' });
+    }
+    if (req.user.role === 'resident' && req.user.flatNo !== flatNo) {
+      return res.status(403).json({ message: 'Forbidden: Flat number mismatch' });
+    }
     const recipientValue = role === 'admin' ? 'admin' : flatNo;
     if (!recipientValue) {
       return res.status(400).json({ message: 'Flat number is required for residents' });
@@ -23,14 +29,15 @@ const getNotifications = async (req, res) => {
 
 const markAsRead = async (req, res) => {
   try {
-    const notification = await Notification.findByIdAndUpdate(
-      req.params.id,
-      { isRead: true },
-      { new: true }
-    );
+    const notification = await Notification.findById(req.params.id);
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
+    if (req.user.role !== 'admin' && notification.recipient !== 'all' && notification.recipient !== req.user.flatNo) {
+      return res.status(403).json({ message: 'Forbidden: Cannot access this notification' });
+    }
+    notification.isRead = true;
+    await notification.save();
     res.status(200).json(notification);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -43,14 +50,22 @@ const clearAllNotifications = async (req, res) => {
     if (!role) {
       return res.status(400).json({ message: 'Role is required' });
     }
+    if (req.user.role !== 'admin' && req.user.role !== role) {
+      return res.status(403).json({ message: 'Forbidden: Role mismatch' });
+    }
+    if (req.user.role === 'resident' && req.user.flatNo !== flatNo) {
+      return res.status(403).json({ message: 'Forbidden: Flat number mismatch' });
+    }
     const recipientValue = role === 'admin' ? 'admin' : flatNo;
     if (!recipientValue) {
       return res.status(400).json({ message: 'Flat number is required' });
     }
 
-    await Notification.deleteMany({
-      recipient: { $in: [recipientValue, 'all'] }
-    });
+    if (req.user.role === 'admin') {
+      await Notification.deleteMany({ recipient: recipientValue });
+    } else {
+      await Notification.deleteMany({ recipient: recipientValue });
+    }
 
     res.status(200).json({ message: 'Notifications cleared successfully' });
   } catch (error) {

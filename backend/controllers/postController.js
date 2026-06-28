@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
+const Resident = require('../models/Resident');
 
 const getPosts = async (req, res) => {
   try {
@@ -12,8 +13,20 @@ const getPosts = async (req, res) => {
 };
 
 const createPost = async (req, res) => {
-  const { title, description, authorName, flatNo, category } = req.body;
+  const { title, description, category } = req.body;
   try {
+    let authorName = 'System Admin';
+    let flatNo = 'Admin';
+
+    if (req.user.role === 'resident') {
+      const resident = await Resident.findOne({ email: req.user.email });
+      if (!resident) {
+        return res.status(404).json({ message: 'Resident account not found' });
+      }
+      authorName = resident.name;
+      flatNo = resident.flatNo;
+    }
+
     const newPost = new Post({
       title,
       description,
@@ -44,7 +57,7 @@ const createPost = async (req, res) => {
 
 const addComment = async (req, res) => {
   const { id } = req.params;
-  const { text, authorName, flatNo } = req.body;
+  const { text } = req.body;
   try {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({ message: 'Post not found' });
@@ -53,6 +66,19 @@ const addComment = async (req, res) => {
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
+
+    let authorName = 'System Admin';
+    let flatNo = 'Admin';
+
+    if (req.user.role === 'resident') {
+      const resident = await Resident.findOne({ email: req.user.email });
+      if (!resident) {
+        return res.status(404).json({ message: 'Resident account not found' });
+      }
+      authorName = resident.name;
+      flatNo = resident.flatNo;
+    }
+
     post.comments.push({ text, authorName, flatNo });
     const saved = await post.save();
     try {
@@ -73,8 +99,34 @@ const addComment = async (req, res) => {
   }
 };
 
+const deletePost = async (req, res) => {
+  const { id } = req.params;
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    const post = await Post.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    if (req.user.role !== 'admin') {
+      const resident = await Resident.findOne({ email: req.user.email });
+      if (!resident || resident.flatNo !== post.flatNo) {
+        return res.status(403).json({ message: 'Forbidden: You cannot delete this post' });
+      }
+    }
+
+    await post.deleteOne();
+    res.status(200).json({ message: 'Post deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getPosts,
   createPost,
-  addComment
+  addComment,
+  deletePost
 };

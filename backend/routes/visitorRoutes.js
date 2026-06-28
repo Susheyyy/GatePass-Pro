@@ -14,7 +14,7 @@ router.route('/')
   .get(protectRoute, authorizeVisitorAccess, getVisitors)
   .post(protectRoute, authorizeVisitorAccess, addVisitor);
 
-router.post('/verify', protectRoute, authorizeVisitorAccess, passcodeLimiter, verifyPasscode);
+router.post('/verify', protectRoute, passcodeLimiter, authorizeVisitorAccess, verifyPasscode);
 
 router.route('/:id')
   .put(protectRoute, authorizeVisitorAccess, updateVisitor)

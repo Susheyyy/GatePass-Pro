@@ -3,12 +3,10 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/residents';
 
 axios.interceptors.request.use((config) => {
-  const role = localStorage.getItem('gatepass_role') || 'resident';
-  const email = localStorage.getItem('gatepass_resident_email') || '';
-  const residentId = localStorage.getItem('gatepass_resident_id') || '';
-  config.headers['X-User-Role'] = role;
-  config.headers['X-User-Email'] = email;
-  config.headers['X-User-Resident-Id'] = residentId;
+  const token = localStorage.getItem('gatepass_token');
+  if (token && token !== 'true') {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
   return config;
 }, (error) => {
   return Promise.reject(error);
@@ -623,6 +621,18 @@ export const postApi = {
         return list[index];
       }
       throw new Error('Post not found in local storage');
+    }
+  },
+  delete: async (id) => {
+    try {
+      const response = await axios.delete(`${POST_API_BASE_URL}/${id}`);
+      return response.data;
+    } catch (error) {
+      console.warn('Backend offline, deleting post locally:', error.message);
+      const list = getLocalPosts();
+      const filtered = list.filter(p => p._id !== id);
+      saveLocalPosts(filtered);
+      return { message: 'Post deleted successfully' };
     }
   }
 };

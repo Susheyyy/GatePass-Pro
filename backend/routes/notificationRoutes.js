@@ -6,13 +6,14 @@ const {
   clearAllNotifications,
   createNotification
 } = require('../controllers/notificationController');
+const { protectRoute, restrictToRoles } = require('../middleware/authMiddleware');
 
 router.route('/')
-  .get(getNotifications)
-  .post(createNotification)
-  .delete(clearAllNotifications);
+  .get(protectRoute, getNotifications)
+  .post(protectRoute, restrictToRoles('admin'), createNotification)
+  .delete(protectRoute, clearAllNotifications);
 
 router.route('/:id/read')
-  .put(markAsRead);
+  .put(protectRoute, markAsRead);
 
 module.exports = router;

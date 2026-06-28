@@ -119,7 +119,7 @@ const addResident = async (req, res) => {
     }
     
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const link = `${frontendUrl}/login?email=${generatedEmail}&otp=${generatedOtp}`;
+    const link = `${frontendUrl}/login?email=${generatedEmail}`;
     
     const mailOptions = {
       from: process.env.SMTP_MAIL,
@@ -328,7 +328,7 @@ const resendOtp = async (req, res) => {
     await resident.save();
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const link = `${frontendUrl}/login?email=${resident.email}&otp=${generatedOtp}`;
+    const link = `${frontendUrl}/login?email=${resident.email}`;
     
     const mailOptions = {
       from: process.env.SMTP_MAIL,
@@ -371,7 +371,7 @@ const forgotPassword = async (req, res) => {
     await resident.save();
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const link = `${frontendUrl}/login?email=${resident.email}&otp=${generatedOtp}`;
+    const link = `${frontendUrl}/login?email=${resident.email}`;
 
     const mailOptions = {
       from: process.env.SMTP_MAIL,
@@ -433,6 +433,37 @@ const loginResident = async (req, res) => {
     }
     
     const formattedEmail = email.trim().toLowerCase();
+    const jwt = require('jsonwebtoken');
+    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
+
+    if (formattedEmail === 'admin@gatepass.com') {
+      const currentAdminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+      if (password !== currentAdminPassword) {
+        return res.status(400).json({ message: 'Invalid password' });
+      }
+      const token = jwt.sign({ role: 'admin', email: formattedEmail }, jwtSecret, { expiresIn: '1d' });
+      return res.status(200).json({
+        message: 'Login successful',
+        token,
+        role: 'admin',
+        email: formattedEmail
+      });
+    }
+
+    if (formattedEmail === 'security@gatepass.com') {
+      const currentSecurityPassword = process.env.SECURITY_PASSWORD || 'security123';
+      if (password !== currentSecurityPassword) {
+        return res.status(400).json({ message: 'Invalid password' });
+      }
+      const token = jwt.sign({ role: 'security', email: formattedEmail }, jwtSecret, { expiresIn: '1d' });
+      return res.status(200).json({
+        message: 'Login successful',
+        token,
+        role: 'security',
+        email: formattedEmail
+      });
+    }
+
     const resident = await Resident.findOne({
       $or: [
         { email: formattedEmail },
@@ -458,11 +489,19 @@ const loginResident = async (req, res) => {
       return res.status(400).json({ message: 'Invalid password' });
     }
 
+    const token = jwt.sign(
+      { role: 'resident', email: resident.email, residentId: resident._id, flatNo: resident.flatNo },
+      jwtSecret,
+      { expiresIn: '1d' }
+    );
+
     const responseObj = resident.toObject();
     delete responseObj.password;
 
     res.status(200).json({
       message: 'Login successful',
+      token,
+      role: 'resident',
       resident: responseObj
     });
   } catch (error) {

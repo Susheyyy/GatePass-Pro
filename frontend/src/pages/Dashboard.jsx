@@ -26,39 +26,55 @@ export default function Dashboard() {
   useEffect(() => {
     const socket = getSocket();
     if (socket) {
-      const reloadStats = async () => {
-        try {
-          const residents = await residentApi.getAll();
-          const visitorsList = await visitorApi.getAll();
-          const activeVisitors = visitorsList.filter(v => v.status === 'Checked In').length;
+      const handleVisitorChange = (updatedVisitor) => {
+        setData(prev => {
+          const exists = prev.recentVisitors.some(v => v._id === updatedVisitor._id);
+          let updatedRecent = prev.recentVisitors;
+          if (exists) {
+            updatedRecent = prev.recentVisitors.map(v => v._id === updatedVisitor._id ? updatedVisitor : v);
+          } else {
+            updatedRecent = [updatedVisitor, ...prev.recentVisitors].slice(0, 4);
+          }
+
+          let diffActive = 0;
+          const wasActive = prev.recentVisitors.find(v => v._id === updatedVisitor._id)?.status === 'Checked In';
+          const isActive = updatedVisitor.status === 'Checked In';
+          if (!wasActive && isActive) diffActive = 1;
+          if (wasActive && !isActive) diffActive = -1;
+
+          return {
+            ...prev,
+            activeVisitors: Math.max(0, prev.activeVisitors + diffActive),
+            recentVisitors: updatedRecent
+          };
+        });
+      };
+
+      const handleDistressChange = () => {
+        residentApi.getAll().then(residents => {
           let pendingAlerts = 0;
           residents.forEach(r => {
             if (r.distressStatus === 'Active') {
               pendingAlerts += 1;
             }
           });
-          const recent = visitorsList.slice(0, 4);
-          setData({
-            activeVisitors,
-            totalResidents: residents.length,
-            pendingAlerts,
-            recentVisitors: recent
-          });
-        } catch (err) {
-          console.error('Error reloading dashboard stats on socket event:', err);
-        }
+          setData(prev => ({
+            ...prev,
+            pendingAlerts
+          }));
+        });
       };
 
-      socket.on('distress_alert', reloadStats);
-      socket.on('distress_resolved', reloadStats);
-      socket.on('visitor_approval_changed', reloadStats);
-      socket.on('visitor_check_status', reloadStats);
+      socket.on('distress_alert', handleDistressChange);
+      socket.on('distress_resolved', handleDistressChange);
+      socket.on('visitor_approval_changed', handleVisitorChange);
+      socket.on('visitor_check_status', handleVisitorChange);
 
       return () => {
-        socket.off('distress_alert', reloadStats);
-        socket.off('distress_resolved', reloadStats);
-        socket.off('visitor_approval_changed', reloadStats);
-        socket.off('visitor_check_status', reloadStats);
+        socket.off('distress_alert', handleDistressChange);
+        socket.off('distress_resolved', handleDistressChange);
+        socket.off('visitor_approval_changed', handleVisitorChange);
+        socket.off('visitor_check_status', handleVisitorChange);
       };
     }
   }, []);
@@ -114,13 +130,6 @@ export default function Dashboard() {
       icon: <UserCheck size={22} />,
       color: 'var(--success)',
       bg: 'var(--success-light)'
-    },
-    {
-      label: 'Gate Staff Active',
-      value: '6 / 8',
-      icon: <ShieldCheck size={22} />,
-      color: '#8b5cf6',
-      bg: 'rgba(139, 92, 246, 0.08)'
     },
     {
       label: 'Pending Alerts',
@@ -289,17 +298,54 @@ export default function Dashboard() {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button className="btn-global" style={{
-                justifyContent: 'flex-start',
-                backgroundColor: 'var(--primary-light)',
-                color: 'var(--primary)',
-                border: '1px solid var(--primary-border)',
-                width: '100%'
-              }}>
+              <button 
+                onClick={async () => {
+                  try {
+                    const visitorsList = await visitorApi.getAll();
+                    if (!visitorsList || visitorsList.length === 0) {
+                      toast.info('No visitor logs available to export.');
+                      return;
+                    }
+                    const headers = ['Name', 'Type', 'Mobile', 'FlatNo', 'Status', 'Purpose', 'VehicleNumber', 'CheckedInAt', 'CheckedOutAt', 'CreatedAt'];
+                    const rows = visitorsList.map(v => [
+                      `"${v.name}"`,
+                      `"${v.type}"`,
+                      `"${v.mobile}"`,
+                      `"${v.flatNo}"`,
+                      `"${v.status}"`,
+                      `"${v.purpose || ''}"`,
+                      `"${v.vehicleNumber || ''}"`,
+                      `"${v.checkedInAt ? new Date(v.checkedInAt).toLocaleString() : ''}"`,
+                      `"${v.checkedOutAt ? new Date(v.checkedOutAt).toLocaleString() : ''}"`,
+                      `"${new Date(v.createdAt).toLocaleString()}"`
+                    ]);
+                    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `VisitorLogs_${new Date().toISOString().split('T')[0]}.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  } catch (err) {
+                    toast.error('Failed to export visitor logs.');
+                  }
+                }}
+                className="btn-global" 
+                style={{
+                  justifyContent: 'flex-start',
+                  backgroundColor: 'var(--primary-light)',
+                  color: 'var(--primary)',
+                  border: '1px solid var(--primary-border)',
+                  width: '100%'
+                }}
+              >
                 <FileText size={18} />
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>Export Visitor Logs</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>Download daily Excel sheet</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>Download daily CSV sheet</div>
                 </div>
               </button>
 
