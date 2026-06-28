@@ -14,7 +14,7 @@ const {
 
 const { loginLimiter } = require('../middleware/visitorLimiter');
 
-const { protectRoute, restrictToRoles } = require('../middleware/authMiddleware');
+const { protectRoute, restrictToRoles, authorizeResidentAccess } = require('../middleware/authMiddleware');
 
 router.route('/')
   .get(protectRoute, restrictToRoles('admin', 'resident'), getResidents)
@@ -26,7 +26,7 @@ router.post('/forgot-password', loginLimiter, forgotPassword);
 router.post('/reset-password', resetForgotPassword);
 
 router.route('/:id')
-  .put(protectRoute, updateResident)
+  .put(protectRoute, authorizeResidentAccess, updateResident)
   .delete(protectRoute, restrictToRoles('admin'), deleteResident);
 
 router.route('/:id/resend-otp')

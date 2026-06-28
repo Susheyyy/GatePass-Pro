@@ -6,6 +6,7 @@ const residentRoutes = require('./routes/residentRoutes');
 const visitorRoutes = require('./routes/visitorRoutes');
 const postRoutes = require('./routes/postRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const helmet = require('helmet');
 
 const http = require('http');
 const socketio = require('socket.io');
@@ -23,6 +24,7 @@ const io = socketio(server, {
 
 connectDB();
 
+app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*'
 }));

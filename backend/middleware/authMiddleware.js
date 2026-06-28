@@ -75,8 +75,23 @@ const restrictToRoles = (...allowedRoles) => {
   };
 };
 
+const authorizeResidentAccess = async (req, res, next) => {
+  try {
+    if (req.user.role === 'admin') {
+      return next();
+    }
+    if (req.params.id && req.params.id !== req.user.residentId.toString()) {
+      return res.status(403).json({ message: 'Forbidden: You cannot modify another resident\'s profile' });
+    }
+    next();
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   protectRoute,
   authorizeVisitorAccess,
-  restrictToRoles
+  restrictToRoles,
+  authorizeResidentAccess
 };
