@@ -35,7 +35,7 @@ export default function Visitors() {
   });
   const [selectedVisitor, setSelectedVisitor] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-  const userRole = localStorage.getItem('gatepass_role') || 'admin';
+  const [userRole] = useState(() => localStorage.getItem('gatepass_role') || 'admin');
   const [verifyFlatNo, setVerifyFlatNo] = useState('');
   const [verifyPasscode, setVerifyPasscode] = useState('');
   const [verifyingPasscode, setVerifyingPasscode] = useState(false);

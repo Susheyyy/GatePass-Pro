@@ -138,7 +138,6 @@ export const residentApi = {
       });
       return response.data.residents ?? response.data;
     } catch (error) {
-      console.warn('Backend offline, using LocalStorage fallback:', error.message);
       let list = getLocalResidents();
       if (searchQuery) {
         const regex = new RegExp(searchQuery, 'i');
@@ -157,7 +156,6 @@ export const residentApi = {
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      console.warn('Backend offline, saving to LocalStorage:', error.message);
       const list = getLocalResidents();
       const existingGmail = list.find(r => r.gmail.toLowerCase() === residentData.gmail.trim().toLowerCase());
       if (existingGmail) {
@@ -211,7 +209,6 @@ export const residentApi = {
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      console.warn('Backend offline, updating in LocalStorage:', error.message);
       const list = getLocalResidents();
       const index = list.findIndex(r => r._id === id);
       if (index !== -1) {
@@ -291,7 +288,6 @@ export const residentApi = {
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      console.warn('Backend offline, deleting from LocalStorage:', error.message);
       const list = getLocalResidents();
       const filtered = list.filter(r => r._id !== id);
       saveLocalResidents(filtered);
@@ -307,7 +303,6 @@ export const residentApi = {
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      console.warn('Backend offline, generating new OTP locally:', error.message);
       const list = getLocalResidents();
       const index = list.findIndex(r => r._id === id);
       if (index !== -1) {
@@ -328,7 +323,6 @@ export const residentApi = {
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      console.warn('Backend offline, calling forgotPassword locally:', error.message);
       const list = getLocalResidents();
       const matched = list.find(r => r.email.toLowerCase() === email.trim().toLowerCase() || r.gmail.toLowerCase() === email.trim().toLowerCase());
       if (matched) {
@@ -349,7 +343,6 @@ export const residentApi = {
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      console.warn('Backend offline, resetting password locally:', error.message);
       const list = getLocalResidents();
       const matched = list.find(r => r.email.toLowerCase() === email.trim().toLowerCase() || r.gmail.toLowerCase() === email.trim().toLowerCase());
       if (matched) {

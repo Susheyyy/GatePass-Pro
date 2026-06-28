@@ -46,7 +46,6 @@ const createPost = async (req, res) => {
         req.io.emit('new_notification', newNotif);
       }
     } catch (err) {
-      console.error('Error creating notification:', err);
     }
 
     res.status(201).json(saved);
@@ -90,7 +89,6 @@ const addComment = async (req, res) => {
         type: 'community'
       });
     } catch (err) {
-      console.error('Error creating notification:', err);
     }
 
     res.status(201).json(saved);

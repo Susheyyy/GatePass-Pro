@@ -75,6 +75,12 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: "GatePass Pro Backend API Online" });
 });
 
+app.disable('x-powered-by');
+
+app.use((req, res) => {
+  res.status(404).json({ message: 'Resource not found' });
+});
+
 server.listen(PORT, () => {
   console.log(`Server running successfully on port ${PORT}`);
 });

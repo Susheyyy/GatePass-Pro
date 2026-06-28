@@ -131,7 +131,6 @@ const addResident = async (req, res) => {
     try {
       await transporter.sendMail(mailOptions);
     } catch (mailError) {
-      console.error(mailError);
     }
     
     res.status(201).json(resident);
@@ -213,7 +212,6 @@ const updateResident = async (req, res) => {
         try {
           await transporter.sendMail(mailOptions);
         } catch (mailError) {
-          console.error(mailError);
         }
       }
       resident.bio = bio !== undefined ? bio : resident.bio;
@@ -340,7 +338,6 @@ const resendOtp = async (req, res) => {
     try {
       await transporter.sendMail(mailOptions);
     } catch (mailError) {
-      console.error(mailError);
     }
 
     res.status(200).json({ message: 'New OTP sent successfully' });
@@ -383,7 +380,6 @@ const forgotPassword = async (req, res) => {
     try {
       await transporter.sendMail(mailOptions);
     } catch (mailError) {
-      console.error(mailError);
     }
 
     res.status(200).json({ message: 'Verification OTP sent to your registered Gmail address' });
@@ -593,7 +589,6 @@ const bulkCreateResidents = async (req, res) => {
       try {
         await transporter.sendMail(mailOptions);
       } catch (mailError) {
-        console.error(mailError);
       }
 
       created.push(newResident);
