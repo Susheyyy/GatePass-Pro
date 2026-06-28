@@ -36,6 +36,9 @@ export default function Visitors() {
   const [selectedVisitor, setSelectedVisitor] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
+  const [verifyFlatNo, setVerifyFlatNo] = useState('');
+  const [verifyPasscode, setVerifyPasscode] = useState('');
+  const [verifyingPasscode, setVerifyingPasscode] = useState(false);
 
   const fetchVisitors = async (query = '') => {
     setLoading(true);
@@ -117,6 +120,26 @@ export default function Visitors() {
     }
   };
 
+  const handleVerifySubmit = async (e) => {
+    e.preventDefault();
+    if (!verifyFlatNo.trim() || !verifyPasscode.trim()) return;
+    setVerifyingPasscode(true);
+    try {
+      await visitorApi.verifyPasscode({
+        flatNo: verifyFlatNo.trim(),
+        passcode: verifyPasscode.trim()
+      });
+      toast.success('Passcode verified! Visitor checked in successfully.');
+      setVerifyFlatNo('');
+      setVerifyPasscode('');
+      fetchVisitors(searchQuery);
+    } catch (err) {
+      toast.error(err.message || 'Verification failed.');
+    } finally {
+      setVerifyingPasscode(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       await visitorApi.delete(id);
@@ -184,6 +207,43 @@ export default function Visitors() {
           </FormButton>
         </div>
       </div>
+
+      {['admin', 'security'].includes(userRole) && (
+        <div className="content-card" style={{ padding: '24px', background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(50, 11, 53, 0.02) 100%)' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '8px' }}>
+            Gate Pass Verification
+          </h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
+            Verify 6-digit visitor passcode and check them in instantly.
+          </p>
+          <form onSubmit={handleVerifySubmit} style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '150px' }}>
+              <FormInput
+                label="Destination Flat No"
+                value={verifyFlatNo}
+                onChange={(e) => setVerifyFlatNo(e.target.value)}
+                placeholder="e.g. A-101"
+                required
+                style={{ margin: 0 }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: '150px' }}>
+              <FormInput
+                label="6-Digit Passcode"
+                value={verifyPasscode}
+                onChange={(e) => setVerifyPasscode(e.target.value)}
+                placeholder="e.g. 123456"
+                required
+                maxLength={6}
+                style={{ margin: 0 }}
+              />
+            </div>
+            <FormButton type="submit" variant="primary" disabled={verifyingPasscode} style={{ height: '42px' }}>
+              <span>{verifyingPasscode ? 'Verifying...' : 'Verify & Check In'}</span>
+            </FormButton>
+          </form>
+        </div>
+      )}
 
       <div className="content-card">
         <div style={{ marginBottom: '24px', display: 'flex', gap: '15px', alignItems: 'center' }}>

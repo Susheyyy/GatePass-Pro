@@ -1,5 +1,7 @@
 const Visitor = require('../models/Visitor');
 
+const failedAttempts = {};
+
 const getVisitors = async (req, res) => {
   try {
     const { flatNo, search } = req.query;
@@ -127,9 +129,84 @@ const deleteVisitor = async (req, res) => {
   }
 };
 
+const verifyPasscode = async (req, res) => {
+  try {
+    const { flatNo, passcode } = req.body;
+    if (!flatNo || !passcode) {
+      return res.status(400).json({ message: 'Flat number and passcode are required' });
+    }
+
+    const flatKey = flatNo.trim().toUpperCase();
+    const attempts = failedAttempts[flatKey] || { count: 0, lockUntil: null };
+
+    if (attempts.lockUntil && attempts.lockUntil > new Date()) {
+      const remainingTime = Math.ceil((attempts.lockUntil - new Date()) / 1000 / 60);
+      return res.status(403).json({ message: `Flat ${flatNo} is locked out. Try again in ${remainingTime} minutes.` });
+    }
+
+    const visitor = await Visitor.findOne({ flatNo: new RegExp(`^${flatKey}$`, 'i'), passcode: passcode.trim() });
+
+    if (!visitor) {
+      attempts.count += 1;
+      if (attempts.count >= 3) {
+        attempts.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+        failedAttempts[flatKey] = attempts;
+        return res.status(403).json({ message: `Too many invalid attempts. Flat ${flatNo} is locked out for 15 minutes.` });
+      }
+      failedAttempts[flatKey] = attempts;
+      return res.status(400).json({ message: `Invalid passcode. Attempts remaining for flat: ${3 - attempts.count}` });
+    }
+
+    if (attempts.lockUntil && attempts.lockUntil <= new Date()) {
+      attempts.count = 0;
+      attempts.lockUntil = null;
+    }
+
+    if (visitor.status === 'Checked In' || visitor.status === 'Checked Out') {
+      return res.status(400).json({ message: 'This passcode has already been used.' });
+    }
+
+    const createdTime = new Date(visitor.createdAt);
+    if (Date.now() - createdTime.getTime() > 24 * 60 * 60 * 1000) {
+      return res.status(400).json({ message: 'This passcode has expired.' });
+    }
+
+    failedAttempts[flatKey] = { count: 0, lockUntil: null };
+
+    visitor.status = 'Checked In';
+    visitor.checkedInAt = new Date();
+    const updatedVisitor = await visitor.save();
+
+    try {
+      const Notification = require('../models/Notification');
+      const newNotif = await Notification.create({
+        recipient: visitor.flatNo,
+        title: 'Visitor Checked In',
+        message: `${visitor.name} (${visitor.type}) has checked in to your flat.`,
+        type: 'visitor_checkin'
+      });
+      if (req.io) {
+        req.io.to(`room_flat_${visitor.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
+      }
+    } catch (err) {}
+
+    if (req.io) {
+      const roomFlat = `room_flat_${visitor.flatNo.toUpperCase().trim()}`;
+      req.io.to(roomFlat).emit('visitor_check_status', updatedVisitor);
+      req.io.to('room_security').emit('visitor_approval_changed', updatedVisitor);
+      req.io.to('room_admins').emit('visitor_approval_changed', updatedVisitor);
+    }
+
+    res.status(200).json(updatedVisitor);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getVisitors,
   addVisitor,
   updateVisitor,
-  deleteVisitor
+  deleteVisitor,
+  verifyPasscode
 };

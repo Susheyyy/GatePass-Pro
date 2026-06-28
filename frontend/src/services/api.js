@@ -458,6 +458,76 @@ export const visitorApi = {
       throw new Error('Visitor not found in local storage');
     }
   },
+  verifyPasscode: async ({ flatNo, passcode }) => {
+    try {
+      const response = await axios.post(`${VISITOR_API_BASE_URL}/verify`, { flatNo, passcode });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      console.warn('Backend offline, verifying passcode in LocalStorage:', error.message);
+      
+      const flatKey = flatNo.trim().toUpperCase();
+      const localLockouts = JSON.parse(localStorage.getItem('gatepass_flat_lockouts') || '{}');
+      const attempts = localLockouts[flatKey] || { count: 0, lockUntil: null };
+
+      if (attempts.lockUntil && new Date(attempts.lockUntil) > new Date()) {
+        const remainingTime = Math.ceil((new Date(attempts.lockUntil) - new Date()) / 1000 / 60);
+        throw new Error(`Flat ${flatNo} is locked out. Try again in ${remainingTime} minutes.`);
+      }
+
+      const list = getLocalVisitors();
+      const visitorIndex = list.findIndex(v => v.flatNo.toUpperCase().trim() === flatKey && v.passcode === passcode.trim());
+
+      if (visitorIndex === -1) {
+        attempts.count += 1;
+        if (attempts.count >= 3) {
+          attempts.lockUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+          localLockouts[flatKey] = attempts;
+          localStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
+          throw new Error(`Too many invalid attempts. Flat ${flatNo} is locked out for 15 minutes.`);
+        }
+        localLockouts[flatKey] = attempts;
+        localStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
+        throw new Error(`Invalid passcode. Attempts remaining for flat: ${3 - attempts.count}`);
+      }
+
+      if (attempts.lockUntil && new Date(attempts.lockUntil) <= new Date()) {
+        attempts.count = 0;
+        attempts.lockUntil = null;
+        localLockouts[flatKey] = attempts;
+        localStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
+      }
+
+      const visitor = list[visitorIndex];
+      if (visitor.status === 'Checked In' || visitor.status === 'Checked Out') {
+        throw new Error('This passcode has already been used.');
+      }
+
+      const createdTime = new Date(visitor.createdAt);
+      if (Date.now() - createdTime.getTime() > 24 * 60 * 60 * 1000) {
+        throw new Error('This passcode has expired.');
+      }
+
+      localLockouts[flatKey] = { count: 0, lockUntil: null };
+      localStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
+
+      visitor.status = 'Checked In';
+      visitor.checkedInAt = new Date().toISOString();
+      list[visitorIndex] = visitor;
+      saveLocalVisitors(list);
+
+      addLocalNotification({
+        recipient: visitor.flatNo,
+        title: 'Visitor Checked In',
+        message: `${visitor.name} (${visitor.type}) has checked in to your flat.`,
+        type: 'visitor_checkin'
+      });
+
+      return visitor;
+    }
+  },
   delete: async (id) => {
     try {
       const response = await axios.delete(`${VISITOR_API_BASE_URL}/${id}`);

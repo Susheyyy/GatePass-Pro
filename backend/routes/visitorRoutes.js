@@ -4,13 +4,17 @@ const {
   getVisitors,
   addVisitor,
   updateVisitor,
-  deleteVisitor
+  deleteVisitor,
+  verifyPasscode
 } = require('../controllers/visitorController');
 const { protectRoute, authorizeVisitorAccess } = require('../middleware/authMiddleware');
+const { passcodeLimiter } = require('../middleware/visitorLimiter');
 
 router.route('/')
   .get(protectRoute, authorizeVisitorAccess, getVisitors)
   .post(protectRoute, authorizeVisitorAccess, addVisitor);
+
+router.post('/verify', protectRoute, authorizeVisitorAccess, passcodeLimiter, verifyPasscode);
 
 router.route('/:id')
   .put(protectRoute, authorizeVisitorAccess, updateVisitor)

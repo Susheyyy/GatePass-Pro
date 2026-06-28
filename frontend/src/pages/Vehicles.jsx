@@ -61,7 +61,6 @@ export default function Vehicles() {
 
     const cleanVehicleNumber = newVehicleNumber.trim().toUpperCase();
     
-    // Simple validation for plate numbers: alphanumeric, spaces, hyphens
     if (!/^[A-Z0-9 -]{3,15}$/.test(cleanVehicleNumber)) {
       toast.warning('Invalid vehicle number format (Use A-Z, 0-9, space or hyphen).');
       return;
@@ -83,7 +82,6 @@ export default function Vehicles() {
       setMyResidentProfile(updated);
       setNewVehicleNumber('');
       toast.success(`Vehicle ${cleanVehicleNumber} registered successfully!`);
-      // Refresh the directory list to reflect the new vehicle
       const list = await residentApi.getAll();
       setResidents(list);
     } catch (err) {
