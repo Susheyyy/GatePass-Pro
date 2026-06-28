@@ -1,82 +1,95 @@
-# SecuLink
+# GatePass Pro
 
-SecuLink is a full-stack web application that provides a secure, expiring file sharing platform. It enables users to upload, encrypt, and share files, notes, or documents with custom expiration leases, password protection, geofencing, IP restrictions, email verification, and view-only permissions.
+GatePass Pro is a full-stack smart community security and resident management platform. It enables gate security officers, community administrators, and residents to coordinate pre-approved guest passes, manage vehicle directories, broadcast system-wide security alerts, verify visitors using expiring single-use passcodes, and monitor real-time distress status.
 
 ### ⚝ Features
-- **Private & Secure Storage**: Files and text notes are encrypted inside your browser before uploading. The server never sees your passwords or unencrypted files.
-- **Self-Destructing Links**: Set sharing links to automatically expire after a few minutes or hours.
-- **Password Locked**: Secure files with custom access passwords so only authorized people can view them.
-- **One-Time Downloads (Burn-on-Read)**: Make sharing links destroy themselves immediately after the file is downloaded once.
-- **Country & Time Limits (Geofencing)**: Restrict file downloads to specific countries (e.g., India, Singapore, USA) or set active hours of the day when the link is available.
-- **IP Address Lock**: Ensure only specific IP addresses can open your shared links.
-- **Email Passcode Verification (OTP)**: Send a secure verification code directly to the recipient's email before letting them open the file.
-- **Mobile QR Codes**: Instantly scan dynamic QR codes to access files securely from a smartphone.
-- **Secure View-Only Mode**: Display documents directly in the browser with disabled download buttons, disabled right-click, and custom watermarks showing the recipient's IP.
-- **Sensitive Data Scanner**: Scans and warns you automatically if you are uploading files containing credit cards, passwords, or API keys.
-- **Activity & History Logs**: Track when sharing links are created, accessed, or shredded.
-- **Emergency Wipe (System Nuke)**: A single click destroys all active file sharing allocations and wipes metadata from the database instantly.
+- **Visitor Passcode Verification**: Enforce secure 6-digit passcodes for guest entry, verified at the gate.
+- **Passcode Rate Limiting & Lockout**: Prevent brute-force attempts with rate limiting and a 15-minute lockout for any flat after 3 consecutive failed verification attempts.
+- **Single-Use Passcodes**: Passcodes are invalidated instantly upon the guest's first check-in to prevent unauthorized reuse.
+- **24-Hour Expiration (TTL)**: Guest passes automatically expire 24 hours after creation.
+- **Vehicle Directory**: Residents register their vehicle plates so security and neighbors can search and contact owners blocking driveways.
+- **Real-Time Notifications**: Instantly notify residents via sockets when visitors check in or check out.
+- **Emergency Distress Deck**: Residents can trigger distress alerts, sending instant audio alarms and notifications to administrators and guard stations.
+- **System Command deck**: Admin broadcasts alerts directly to tablet guards.
+- **Community Forum**: An announcement board where residents can publish posts and comment on community discussions.
+- **Local Storage Fallback**: A fully functioning offline mode allowing check-ins, lockout logic, and data updates to work seamlessly via LocalStorage when the backend is offline.
 
 ### ⚝ Tech Stack
-- Frontend: React.js, TypeScript, Custom Vanilla CSS, Lucide Icons
-- Backend: Node.js, Express, Multer
-- Database: SQLite, PostgreSQL, Sequelize ORM
-- File Storage: Local Filesystem, Firebase Cloud Storage
+- Frontend: React.js, Vite, Custom Vanilla CSS, Lucide Icons, Socket.io-client
+- Backend: Node.js, Express, Socket.io, Express-rate-limit
+- Database: MongoDB, Mongoose ORM
+- Communication: Sockets for real-time alerts, Nodemailer for registration OTPs
 
 ### ⚝ System Architecture <br>
-SecuLink is designed around zero-knowledge security and access control. The system is divided into five high-level areas:
-- Frontend: The client-side application handles user interface rendering, theme management, local file previews, and browser-side encryption. Keys are derived locally in the browser using PBKDF2/WebCrypto APIs so that plain text payloads are never transmitted across the network.
-- Encryption Layer: This layer manages the encryption and decryption processes. Payloads are encrypted using AES-256-GCM client-side. The metadata security envelopes are stored in the database, optionally encrypted with a server-managed master secret.
-- Backend API: A Node.js Express server validates access constraints (expiry, IP boundaries, active time windows, country restrictions). It also coordinates automated malware scanning, SMTP email alerts, and the ephemeral chat messages.
-- Database: Managed via Sequelize ORM, the database stores file records, expiration leases, chat histories, and audit logs. It supports SQLite for local testing and PostgreSQL for production.
-- File Storage: Manages physical file assets. Files are written locally to the server's uploads folder using stream-based operations, or pushed to a Firebase Cloud Storage bucket.
+GatePass Pro is built for real-time security updates, access validation, and community management. The system is divided into five high-level areas:
+- Frontend: A responsive React application with customized CSS design and fallback handlers. It serves three roles: Admin, Security (Gate guards), and Residents.
+- Real-Time Socket Layer: Coordinates instant distress alert sounds, system broadcasts, and notifications between the guard cabin, residents, and admins.
+- Security & Rate Limit Layer: Middleware protecting verification routes by IP rate limiting (Express-rate-limit) and custom flat-level lockout counts.
+- Database: Mongoose models storing residents, approved visitor schedules, posts, and real-time distress records.
+- Mailer Service: Relays registered account OTP codes and approvals via SMTP.
 
 ```
-SecuLink/
-├── backend/                  # Node.js + Express backend 
+GatePass-Pro/
+├── backend/                  # Node.js + Express backend
+│   ├── config/
+│   │   └── db.js             # MongoDB database connection configuration
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   ├── notificationController.js
+│   │   ├── postController.js
+│   │   ├── residentController.js
+│   │   └── visitorController.js # Verification logic, single-use, TTL, and lockout attempts
+│   ├── middleware/
+│   │   ├── authMiddleware.js
+│   │   └── visitorLimiter.js # IP rate limiter for passcode checks
+│   ├── models/
+│   │   ├── Notification.js
+│   │   ├── Post.js
+│   │   ├── Resident.js       # Resident info, vehicle listings, and distress logs
+│   │   └── Visitor.js
+│   ├── routes/
+│   │   ├── authRoutes.js
+│   │   ├── notificationRoutes.js
+│   │   ├── postRoutes.js
+│   │   ├── residentRoutes.js
+│   │   └── visitorRoutes.js
+│   ├── server.js             # Main server entry point initializing Express, Sockets, and routes
+│   └── package.json          # Backend dependencies
+├── frontend/                 # React + Vite frontend
 │   ├── src/
-│   │   ├── config/
-│   │   │   └── database.ts   # Sequelize database connection configuration
-│   │   ├── models/           
-│   │   │   ├── file.ts       # File metadata schema & constraints
-│   │   │   ├── index.ts      # Database connection & associations initializer
-│   │   │   ├── log.ts        # Audit trails & logs schema
-│   │   │   └── message.ts    # Secure ephemeral chat messages schema
-│   │   ├── routes/
-│   │   │   └── vault.ts      # Express routes for upload, challenge verification, download, and nuke
-│   │   ├── services/         # Application core services
-│   │   │   ├── cleanupService.ts # Cron-like service for purging expired files
-│   │   │   ├── cryptoService.ts  # Verification helpers & secure envelopes
-│   │   │   ├── databaseService.ts # DB operations manager for files, logs, and wipe operations
-│   │   │   ├── emailService.ts   # SMTP service for sending OTP passcodes
-│   │   │   ├── storageService.ts # Storage backend wrapper (Local & Firebase Storage)
-│   │   │   └── virusScanService.ts # ClamAV/Sensitive data scanner (PII, API keys)
-│   │   ├── server.ts         # Main entry point for backend API server
-│   │   └── verify.ts         # Helper methods for security checks (IP, country, time, email OTP)
-│   ├── package.json          # Node dependencies & scripts
-│   └── tsconfig.json         # TypeScript compiler configurations
-├── frontend/                 # React + TypeScript + Vite frontend 
-│   ├── src/
-│   │   ├── components/       
-│   │   │   ├── ConsolePanel.tsx      # System console log dashboard & emergency wipe control
-│   │   │   ├── DownloadChallenge.tsx # Verification gateway, decryption, & secure view-only mode
-│   │   │   ├── UploadPanel.tsx       # File dropzone & security policy configuration panel
-│   │   │   └── VaultStatus.tsx       # Live status tracker for active files & audit histories
-│   │   ├── utils/
-│   │   │   └── cryptoWorker.ts       # Web Worker for client-side PBKDF2/AES-256-GCM crypto
-│   │   ├── App.css           
-│   │   ├── App.tsx           
-│   │   ├── index.css         
-│   │   └── main.tsx          
-│   ├── package.json          # Frontend dependencies & scripts
-│   └── vite.config.ts        # Vite build tool and dev server config
+│   │   ├── components/
+│   │   │   ├── FormComponents.jsx
+│   │   │   ├── Layout.jsx    # Real-time socket listener, sidebar, and distress alarm banner
+│   │   │   └── ProtectedRoute.jsx
+│   │   ├── context/
+│   │   │   └── ToastContext.jsx
+│   │   ├── pages/
+│   │   │   ├── Community.jsx  # Community post announcement board
+│   │   │   ├── Dashboard.jsx  # Admin control deck with real-time stats
+│   │   │   ├── Login.jsx
+│   │   │   ├── Profile.jsx    # Resident account preferences
+│   │   │   ├── Register.jsx
+│   │   │   ├── ResidentDashboard.jsx # Resident pre-approvals, members, and distress alerts
+│   │   │   ├── Residents.jsx  # Resident master table and registration request deck
+│   │   │   ├── Vehicles.jsx   # Vehicle owner directory and plate search interface
+│   │   │   └── Visitors.jsx   # Gate pass check-in panel and entry log lists
+│   │   ├── services/
+│   │   │   ├── api.js         # API request layer with complete LocalStorage fallback
+│   │   │   └── socket.js      # Socket client helper
+│   │   ├── App.css
+│   │   ├── App.jsx           # Client routes
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── package.json          # Frontend dependencies
+│   └── vite.config.js        # Vite configurations
 └── README.md                 # Project documentation
 ```
 
 ### ⚝ Installation & Setup
 1. Clone the Repository
    ```bash
-   git clone https://github.com/Susheyyy/SecuLink.git
-   cd SecuLink
+   git clone https://github.com/Susheyyy/GatePass-Pro.git
+   cd GatePass-Pro
    ```
 2. Backend Setup
    ```bash
@@ -86,15 +99,12 @@ SecuLink/
    Create a .env file in the /backend folder:
    ```env
    PORT=5000
-   NODE_ENV=development
-   SECRET_KEY=your_32_character_master_secret_here
-   FIREBASE_STORAGE_BUCKET=
-   FIREBASE_SERVICE_ACCOUNT_KEY=
+   MONGO_URI=your_mongodb_connection_uri
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
-   SMTP_USER=your_email@gmail.com
-   SMTP_PASS=your_app_specific_password_here
-   EMAIL_FROM=noreply@seculink.com
+   SMTP_MAIL=your_email@gmail.com
+   SMTP_PASSWORD=your_app_specific_password_here
+   FRONTEND_URL=http://localhost:5173
    ```
    Run the backend server:
    ```bash
@@ -108,13 +118,8 @@ SecuLink/
    ```
 
 ### ⚝ How to Use
-- Upload Files: Drag and drop files or write a secure text note in the uploader dashboard.
-- Configure Access Rules: Choose the expiration duration (compulsory) and customize other settings under Advanced Security Options (password, geofencing, IP lock, or OTP verification).
-- Generate Secure Link: Click "Generate Link" to encrypt the file, create the database record, and display the private URL or dynamic QR code.
-- Recipient Verification: The recipient accesses the private link, completes the password or OTP challenge, and downloads or views the file securely.
-- Monitor and Purge: Track active allocations in the "Active Shares" panel, view audit logs, or trigger "Purge All Shares" to wipe everything immediately.
-
-### ⚝ Live Demo
-
-If you have feedback or ideas, feel free to reach out! <br>
-If you like this project, consider giving it a star!
+- Pre-Approve Visitors: Residents log into the Resident Dashboard, select "New Entry Pass", input visitor details, and generate a secure 6-digit passcode.
+- Gate Check-In: The guard/security officer uses the "Gate Pass Verification" panel on the Visitors page, inputs the destination flat number and passcode, and checks in the visitor.
+- Search Vehicles: Look up any blocking vehicle number in the "Vehicle Directory" to instantly find the owner's flat and phone number.
+- Broadcast System Alerts: Administrators use the "System Command Deck" to push instant broadcast messages to all tablet guards.
+- Trigger Distress: If an emergency occurs, the resident triggers distress in their panel, setting off a system-wide audio alarm for administrators.
