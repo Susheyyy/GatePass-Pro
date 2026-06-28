@@ -14,8 +14,10 @@ const {
 
 const { loginLimiter } = require('../middleware/visitorLimiter');
 
+const { protectRoute, restrictToRoles } = require('../middleware/authMiddleware');
+
 router.route('/')
-  .get(getResidents)
+  .get(protectRoute, restrictToRoles('admin', 'resident'), getResidents)
   .post(addResident);
 
 router.post('/bulk', bulkCreateResidents);
