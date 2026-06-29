@@ -196,7 +196,12 @@ const updateResident = async (req, res) => {
       }
       resident.members = members !== undefined ? (parseInt(members) || resident.members) : resident.members;
       const wasPending = resident.status === 'Pending';
-      resident.status = status || resident.status;
+      if (status && status !== resident.status) {
+        if (!req.user || req.user.role !== 'admin') {
+          return res.status(403).json({ message: 'Forbidden: Only administrators can update resident status' });
+        }
+        resident.status = status;
+      }
       
       if (status === 'Approved' && wasPending) {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';

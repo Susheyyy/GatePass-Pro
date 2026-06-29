@@ -309,7 +309,7 @@ export const residentApi = {
         const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
         list[index].otp = generatedOtp;
         saveLocalResidents(list);
-        return { message: 'New OTP sent successfully', otp: generatedOtp };
+        return { message: 'New OTP sent successfully' };
       }
       throw new Error('Resident not found in local storage');
     }
@@ -329,7 +329,7 @@ export const residentApi = {
         const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
         matched.otp = generatedOtp;
         saveLocalResidents(list);
-        return { message: 'Verification OTP sent to your registered Gmail address', otp: generatedOtp };
+        return { message: 'Verification OTP sent to your registered Gmail address' };
       }
       throw new Error('Resident not found with this email');
     }
@@ -562,15 +562,31 @@ export const postApi = {
       return getLocalPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
   },
-  create: async (postData) => {
+  create: async (title, description, category) => {
     try {
-      const response = await axios.post(POST_API_BASE_URL, postData);
+      const response = await axios.post(POST_API_BASE_URL, { title, description, category });
       return response.data;
     } catch (error) {
       console.warn('Backend offline, saving post to LocalStorage:', error.message);
       const list = getLocalPosts();
+      let authorName = 'System Admin';
+      let flatNo = 'Admin';
+      const role = localStorage.getItem('gatepass_role');
+      const resId = localStorage.getItem('gatepass_resident_id');
+      if (role === 'resident' && resId) {
+        const residentsList = getLocalResidents();
+        const resident = residentsList.find(r => r._id === resId);
+        if (resident) {
+          authorName = resident.name;
+          flatNo = resident.flatNo;
+        }
+      }
       const newPost = {
-        ...postData,
+        title,
+        description,
+        category: category || 'General',
+        authorName,
+        flatNo,
         _id: 'mock-post-' + Math.random().toString(36).substr(2, 9),
         createdAt: new Date().toISOString()
       };
@@ -585,9 +601,9 @@ export const postApi = {
       return newPost;
     }
   },
-  addComment: async (id, commentData) => {
+  addComment: async (id, text) => {
     try {
-      const response = await axios.post(`${POST_API_BASE_URL}/${id}/comments`, commentData);
+      const response = await axios.post(`${POST_API_BASE_URL}/${id}/comments`, { text });
       return response.data;
     } catch (error) {
       console.warn('Backend offline, adding comment in LocalStorage:', error.message);
@@ -597,18 +613,32 @@ export const postApi = {
         if (!list[index].comments) {
           list[index].comments = [];
         }
+        let authorName = 'System Admin';
+        let flatNo = 'Admin';
+        const role = localStorage.getItem('gatepass_role');
+        const resId = localStorage.getItem('gatepass_resident_id');
+        if (role === 'resident' && resId) {
+          const residentsList = getLocalResidents();
+          const resident = residentsList.find(r => r._id === resId);
+          if (resident) {
+            authorName = resident.name;
+            flatNo = resident.flatNo;
+          }
+        }
         const newComment = {
-          ...commentData,
+          text,
+          authorName,
+          flatNo,
           _id: 'mock-comment-' + Math.random().toString(36).substr(2, 9),
           createdAt: new Date().toISOString()
         };
         list[index].comments.push(newComment);
         saveLocalPosts(list);
-        const isSystemAdmin = commentData.flatNo === 'Admin' || commentData.authorName === 'System Admin' || commentData.authorName === 'System Administrator';
+        const isSystemAdmin = flatNo === 'Admin' || authorName === 'System Admin' || authorName === 'System Administrator';
         addLocalNotification({
           recipient: isSystemAdmin ? 'all' : 'admin',
           title: isSystemAdmin ? 'Admin Commented on Post' : 'New Comment on Post',
-          message: `${commentData.authorName} (${commentData.flatNo}): "${commentData.text}" on post "${list[index].title}"`,
+          message: `${authorName} (${flatNo}): "${text}" on post "${list[index].title}"`,
           type: 'community'
         });
         return list[index];

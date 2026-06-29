@@ -69,14 +69,11 @@ export default function Community() {
     }
     setPublishing(true);
     try {
-      const postPayload = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        authorName: currentResident ? currentResident.name : 'Resident',
-        flatNo: currentResident ? currentResident.flatNo : 'N/A',
-        category: formData.category
-      };
-      const created = await postApi.create(postPayload);
+      const created = await postApi.create(
+        formData.title.trim(),
+        formData.description.trim(),
+        formData.category
+      );
       setPosts(prev => [created, ...prev]);
       setFormData({ title: '', description: '', category: 'General' });
       setIsModalOpen(false);
@@ -93,12 +90,7 @@ export default function Community() {
     const commentText = commentInputs[postId]?.trim();
     if (!commentText) return;
     try {
-      const payload = {
-        text: commentText,
-        authorName: currentResident ? currentResident.name : 'System Admin',
-        flatNo: currentResident ? currentResident.flatNo : 'Admin'
-      };
-      const updatedPost = await postApi.addComment(postId, payload);
+      const updatedPost = await postApi.addComment(postId, commentText);
       setPosts(prev => prev.map(p => p._id === postId ? { ...p, comments: updatedPost.comments } : p));
       setCommentInputs(prev => ({ ...prev, [postId]: '' }));
       toast.success('Comment added successfully!');
