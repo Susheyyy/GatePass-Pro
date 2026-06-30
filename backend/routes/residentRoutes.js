@@ -9,7 +9,8 @@ const {
   forgotPassword,
   resetForgotPassword,
   loginResident,
-  bulkCreateResidents
+  bulkCreateResidents,
+  getResidentById
 } = require('../controllers/residentController');
 
 const { loginLimiter } = require('../middleware/visitorLimiter');
@@ -26,6 +27,7 @@ router.post('/forgot-password', loginLimiter, forgotPassword);
 router.post('/reset-password', resetForgotPassword);
 
 router.route('/:id')
+  .get(protectRoute, authorizeResidentAccess, getResidentById)
   .put(protectRoute, authorizeResidentAccess, updateResident)
   .delete(protectRoute, restrictToRoles('admin'), deleteResident);
 

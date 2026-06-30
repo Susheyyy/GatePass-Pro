@@ -19,9 +19,6 @@ import { useToast } from '../context/ToastContext';
 export default function Residents() {
   const toast = useToast();
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
-  if (userRole === 'security') {
-    return <Navigate to="/visitors" replace />;
-  }
   const [residents, setResidents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -65,6 +62,10 @@ export default function Residents() {
   useEffect(() => {
     fetchResidents();
   }, []);
+
+  if (userRole === 'security') {
+    return <Navigate to="/visitors" replace />;
+  }
 
   const handleSearchChange = (e) => {
     const val = e.target.value;

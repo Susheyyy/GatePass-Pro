@@ -44,8 +44,13 @@ export default function Community() {
       setPosts(allPosts);
       
       if (userRole === 'resident') {
-        const list = await residentApi.getAll();
-        const matched = list.find(r => r._id === residentId || r.email.toLowerCase() === residentEmail?.toLowerCase());
+        let matched = null;
+        if (residentId) {
+          matched = await residentApi.getById(residentId);
+        } else {
+          const list = await residentApi.getAll();
+          matched = list.find(r => r.email.toLowerCase() === residentEmail?.toLowerCase());
+        }
         if (matched) {
           setCurrentResident(matched);
         }

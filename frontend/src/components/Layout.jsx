@@ -42,38 +42,35 @@ const playAlarmSound = () => {
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [flatNo, setFlatNo] = useState('');
+  const [flatNo] = useState(() => {
+    const direct = localStorage.getItem('gatepass_flat_no');
+    if (direct) return direct;
+    const token = localStorage.getItem('gatepass_token');
+    if (token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          return payload.flatNo || '';
+        }
+      } catch (err) {}
+    }
+    return '';
+  });
   const [notifications, setNotifications] = useState([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [activeDistressBanner, setActiveDistressBanner] = useState(null);
+  const [distressBanners, setDistressBanners] = useState([]);
 
   const handleLogout = () => {
     localStorage.removeItem('gatepass_token');
     localStorage.removeItem('gatepass_role');
     localStorage.removeItem('gatepass_resident_id');
     localStorage.removeItem('gatepass_resident_email');
+    localStorage.removeItem('gatepass_flat_no');
     navigate('/login');
   };
 
   const userRole = localStorage.getItem('gatepass_role') || 'admin';
-  const residentEmail = localStorage.getItem('gatepass_resident_email') || '';
-
-  useEffect(() => {
-    if (userRole === 'resident' && residentEmail) {
-      const getFlat = async () => {
-        try {
-          const list = await residentApi.getAll();
-          const matched = list.find(r => r.email.toLowerCase() === residentEmail.toLowerCase());
-          if (matched) {
-            setFlatNo(matched.flatNo);
-          }
-        } catch (err) {
-          console.error('Error fetching flat number:', err);
-        }
-      };
-      getFlat();
-    }
-  }, [userRole, residentEmail]);
 
   const fetchNotifications = async () => {
     try {
@@ -98,12 +95,18 @@ export default function Layout({ children }) {
 
       if (userRole === 'admin') {
         socket.on('distress_alert', (data) => {
-          setActiveDistressBanner(data);
+          setDistressBanners(prev => {
+            const exists = prev.some(b => b.residentId === data.residentId);
+            if (exists) {
+              return prev.map(b => b.residentId === data.residentId ? data : b);
+            }
+            return [...prev, data];
+          });
           playAlarmSound();
         });
 
         socket.on('distress_resolved', (data) => {
-          setActiveDistressBanner(prev => (prev && prev.residentId === data.residentId ? null : prev));
+          setDistressBanners(prev => prev.filter(b => b.residentId !== data.residentId));
         });
       }
 
@@ -144,7 +147,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="layout-wrapper">
-      {activeDistressBanner && (
+      {distressBanners.length > 0 && (
         <div style={{
           position: 'fixed',
           top: '20px',
@@ -152,57 +155,65 @@ export default function Layout({ children }) {
           transform: 'translateX(-50%)',
           width: '90%',
           maxWidth: '600px',
-          backgroundColor: '#DC2626',
-          color: 'white',
-          borderRadius: '16px',
-          boxShadow: '0 25px 50px -12px rgba(220, 38, 38, 0.4)',
-          padding: '20px 24px',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '15px',
-          zIndex: 99999,
-          border: '2px solid rgba(255, 255, 255, 0.2)',
-          animation: 'scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          flexDirection: 'column',
+          gap: '12px',
+          zIndex: 99999
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <div style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              borderRadius: '50%',
-              width: '45px',
-              height: '45px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              animation: 'pulse 1s infinite'
-            }}>
-              <ShieldAlert size={26} color="white" />
-            </div>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Emergency Distress Active
-              </h4>
-              <p style={{ margin: '4px 0 0', fontSize: '0.9rem', opacity: 0.95, fontWeight: '500' }}>
-                Resident <strong>{activeDistressBanner.name}</strong> from <strong>Flat {activeDistressBanner.flatNo}</strong> is requesting immediate assistance.
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setActiveDistressBanner(null)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              borderRadius: '8px',
+          {distressBanners.map(banner => (
+            <div key={banner.residentId} style={{
+              backgroundColor: '#DC2626',
               color: 'white',
-              padding: '8px 16px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              transition: 'all 0.2s'
-            }}
-          >
-            Acknowledge
-          </button>
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(220, 38, 38, 0.4)',
+              padding: '20px 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '15px',
+              border: '2px solid rgba(255, 255, 255, 0.2)',
+              animation: 'scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '50%',
+                  width: '45px',
+                  height: '45px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  animation: 'pulse 1s infinite'
+                }}>
+                  <ShieldAlert size={26} color="white" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Emergency Distress Active
+                  </h4>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.9rem', opacity: 0.95, fontWeight: '500' }}>
+                    Resident <strong>{banner.name}</strong> from <strong>Flat {banner.flatNo}</strong> is requesting immediate assistance.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setDistressBanners(prev => prev.filter(b => b.residentId !== banner.residentId))}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  padding: '8px 16px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Acknowledge
+              </button>
+            </div>
+          ))}
         </div>
       )}
       <header className="main-header">

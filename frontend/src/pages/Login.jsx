@@ -85,6 +85,7 @@ export default function Login() {
         localStorage.setItem('gatepass_role', 'resident');
         localStorage.setItem('gatepass_resident_id', matchedResident._id);
         localStorage.setItem('gatepass_resident_email', matchedResident.email);
+        localStorage.setItem('gatepass_flat_no', matchedResident.flatNo);
         setIsLoading(false);
         navigate('/resident-dashboard');
         return;
@@ -127,6 +128,7 @@ export default function Login() {
       localStorage.setItem('gatepass_role', 'resident');
       localStorage.setItem('gatepass_resident_id', updatedResident._id);
       localStorage.setItem('gatepass_resident_email', updatedResident.email);
+      localStorage.setItem('gatepass_flat_no', updatedResident.flatNo);
       setIsLoading(false);
       navigate('/resident-dashboard');
     } catch (err) {
@@ -174,6 +176,7 @@ export default function Login() {
       localStorage.setItem('gatepass_role', 'resident');
       localStorage.setItem('gatepass_resident_id', resident._id);
       localStorage.setItem('gatepass_resident_email', resident.email);
+      localStorage.setItem('gatepass_flat_no', resident.flatNo);
       setIsLoading(false);
       navigate('/resident-dashboard');
     } catch (err) {
