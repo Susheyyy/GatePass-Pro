@@ -12,6 +12,17 @@ axios.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
+export const getUserFromToken = () => {
+  const token = localStorage.getItem('gatepass_token');
+  if (!token || token === 'true') return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload;
+  } catch (e) {
+    return null;
+  }
+};
+
 const DEFAULT_RESIDENTS = [];
 
 const getLocalResidents = () => {
@@ -627,6 +638,102 @@ export const visitorApi = {
         return { message: 'Visitor removed successfully' };
       }
       throw new Error('Visitor not found in local storage');
+    }
+  },
+  exportCSV: async () => {
+    try {
+      const response = await axios.get(`${VISITOR_API_BASE_URL}/export`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'visitors_log.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      const list = getLocalVisitors();
+      let csv = 'Name,Type,Mobile,Flat Number,Status,Purpose,Vehicle Number,Passcode,Checked In,Checked Out,Created At\n';
+      list.forEach(v => {
+        csv += `"${v.name}","${v.type}","${v.mobile}","${v.flatNo}","${v.status}","${v.purpose || ''}","${v.vehicleNumber || ''}","[MASKED]","${v.checkedInAt || ''}","${v.checkedOutAt || ''}","${v.createdAt || ''}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'visitors_log.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+  },
+  toggleLockdown: async (lockdown) => {
+    try {
+      const response = await axios.post(`${VISITOR_API_BASE_URL}/system/lockdown`, { lockdown });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      localStorage.setItem('gatepass_lockdown_offline', lockdown ? 'true' : 'false');
+      return { lockdown };
+    }
+  },
+  getLockdownStatus: async () => {
+    try {
+      const response = await axios.get(`${VISITOR_API_BASE_URL}/system/lockdown`);
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      const isLockdown = localStorage.getItem('gatepass_lockdown_offline') === 'true';
+      return { lockdown: isLockdown };
+    }
+  },
+  addBlocklist: async (mobile, reason) => {
+    try {
+      const response = await axios.post(`${VISITOR_API_BASE_URL}/blocklist`, { mobile, reason });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      const list = JSON.parse(localStorage.getItem('gatepass_blocklist_offline') || '[]');
+      if (!list.some(b => b.mobile === mobile)) {
+        list.push({ mobile, reason, createdAt: new Date().toISOString() });
+        localStorage.setItem('gatepass_blocklist_offline', JSON.stringify(list));
+      }
+      return { mobile, reason };
+    }
+  },
+  getBlocklist: async () => {
+    try {
+      const response = await axios.get(`${VISITOR_API_BASE_URL}/blocklist`);
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      return JSON.parse(localStorage.getItem('gatepass_blocklist_offline') || '[]');
+    }
+  },
+  removeBlocklist: async (mobile) => {
+    try {
+      const response = await axios.delete(`${VISITOR_API_BASE_URL}/blocklist/${mobile}`);
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      let list = JSON.parse(localStorage.getItem('gatepass_blocklist_offline') || '[]');
+      list = list.filter(b => b.mobile !== mobile);
+      localStorage.setItem('gatepass_blocklist_offline', JSON.stringify(list));
+      return { message: 'Mobile number removed from blocklist.' };
     }
   }
 };

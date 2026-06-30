@@ -52,6 +52,8 @@ export default function ResidentDashboard() {
   const toast = useToast();
   const [resident, setResident] = useState(null);
   const [visitors, setVisitors] = useState([]);
+  const [selectedVisitorForPass, setSelectedVisitorForPass] = useState(null);
+  const [isPassDetailOpen, setIsPassDetailOpen] = useState(false);
   const [flatMembers, setFlatMembers] = useState([]);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [memberForm, setMemberForm] = useState({
@@ -176,6 +178,11 @@ export default function ResidentDashboard() {
     } catch (err) {
       toast.error('Failed to approve visitor.');
     }
+  };
+
+  const handleViewPass = (visitor) => {
+    setSelectedVisitorForPass(visitor);
+    setIsPassDetailOpen(true);
   };
 
   const handleRejectVisitor = async (visitorId) => {
@@ -608,19 +615,21 @@ export default function ResidentDashboard() {
                         fontSize: '0.72rem',
                         fontWeight: '700',
                         backgroundColor: 
+                          visitor.isOverdue ? 'var(--accent-light)' :
                           visitor.status === 'Checked In' ? 'var(--success-light)' : 
                           visitor.status === 'Checked Out' ? 'var(--border)' : 
                           visitor.status === 'Approved' ? 'var(--primary-light)' : 
                           visitor.status === 'Rejected' ? 'var(--accent-light)' : 
                           'var(--warning-light)',
                         color: 
+                          visitor.isOverdue ? 'var(--accent)' :
                           visitor.status === 'Checked In' ? 'var(--success)' : 
                           visitor.status === 'Checked Out' ? 'var(--text-muted)' : 
                           visitor.status === 'Approved' ? 'var(--primary)' : 
                           visitor.status === 'Rejected' ? 'var(--accent)' : 
                           'var(--warning)'
                       }}>
-                        {visitor.status}
+                        {visitor.isOverdue ? 'Overdue' : visitor.status}
                       </span>
                     </td>
                     <td style={{ padding: '14px 0', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -658,6 +667,24 @@ export default function ResidentDashboard() {
                             }}
                           >
                             Reject
+                          </button>
+                        </div>
+                      ) : visitor.status === 'Approved' ? (
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleViewPass(visitor)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--primary)',
+                              backgroundColor: 'transparent',
+                              color: 'var(--primary)',
+                              fontWeight: '700',
+                              fontSize: '0.72rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            View Pass
                           </button>
                         </div>
                       ) : (
@@ -1037,6 +1064,82 @@ export default function ResidentDashboard() {
           <MessageSquare size={24} />
         </button>
       </div>
+
+      {isPassDetailOpen && selectedVisitorForPass && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 10000,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '90%',
+            maxWidth: '440px',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
+            padding: '36px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '20px',
+            animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>Visitor Entry Pass</h3>
+              <button onClick={() => { setIsPassDetailOpen(false); setSelectedVisitorForPass(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{
+              width: '100%',
+              padding: '24px',
+              borderRadius: '16px',
+              border: '2px dashed var(--primary-border)',
+              backgroundColor: 'rgba(99, 102, 241, 0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}>
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(selectedVisitorForPass.passcode)}`}
+                alt="Visitor Pass QR Code"
+                style={{ width: '150px', height: '150px', borderRadius: '8px', border: '1px solid var(--border)' }}
+              />
+              
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Visitor Name</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-main)' }}>{selectedVisitorForPass.name}</div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', width: '100%', gap: '12px', textAlign: 'center', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Passcode</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent)' }}>{selectedVisitorForPass.passcode}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Flat No</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary)' }}>{selectedVisitorForPass.flatNo}</div>
+                </div>
+              </div>
+            </div>
+            
+            <FormButton onClick={() => { setIsPassDetailOpen(false); setSelectedVisitorForPass(null); }} variant="primary" style={{ width: '100%' }}>
+              Close Pass
+            </FormButton>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes fadeInUp {

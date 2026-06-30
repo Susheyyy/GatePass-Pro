@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, ShieldAlert, LogOut, Shield, Bell, CheckCircle2, User, MessageSquare, Trash2, Car } from 'lucide-react';
-import { notificationApi, residentApi } from '../services/api';
+import { notificationApi, residentApi, visitorApi, getUserFromToken } from '../services/api';
 import { connectSocket, getSocket, disconnectSocket } from '../services/socket';
+
+const AVATAR_MAP = {
+  avatar1: { emoji: '👤', bg: 'linear-gradient(135deg, #6366f1, #a855f7)' },
+  avatar2: { emoji: '👨‍💼', bg: 'linear-gradient(135deg, #f59e0b, #e11d48)' },
+  avatar3: { emoji: '👩‍💼', bg: 'linear-gradient(135deg, #10b981, #059669)' },
+  avatar4: { emoji: '🧑‍💻', bg: 'linear-gradient(135deg, #06b6d4, #3b82f6)' }
+};
 
 const playAlarmSound = () => {
   try {
@@ -60,6 +67,15 @@ export default function Layout({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [distressBanners, setDistressBanners] = useState([]);
+  const [lockdown, setLockdown] = useState(false);
+  const [avatar, setAvatar] = useState('avatar1');
+
+  const fetchLockdownStatus = async () => {
+    try {
+      const data = await visitorApi.getLockdownStatus();
+      setLockdown(data.lockdown);
+    } catch (err) {}
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('gatepass_token');
@@ -82,6 +98,18 @@ export default function Layout({ children }) {
   };
 
   useEffect(() => {
+    fetchLockdownStatus();
+
+    if (userRole === 'resident') {
+      residentApi.getAll().then(list => {
+        const email = localStorage.getItem('gatepass_resident_email');
+        const current = list.find(r => r.gmail === email);
+        if (current && current.avatar) {
+          setAvatar(current.avatar);
+        }
+      }).catch(() => {});
+    }
+
     if (userRole === 'admin' || userRole === 'security' || (userRole === 'resident' && flatNo)) {
       if (userRole === 'admin' || (userRole === 'resident' && flatNo)) {
         fetchNotifications();
@@ -89,32 +117,41 @@ export default function Layout({ children }) {
 
       const socket = connectSocket(userRole, flatNo);
 
-      socket.on('new_notification', (newNotif) => {
-        setNotifications(prev => [newNotif, ...prev]);
-      });
+      if (socket) {
+        socket.on('new_notification', (newNotif) => {
+          setNotifications(prev => [newNotif, ...prev]);
+        });
 
-      if (userRole === 'admin') {
-        socket.on('distress_alert', (data) => {
-          setDistressBanners(prev => {
-            const exists = prev.some(b => b.residentId === data.residentId);
-            if (exists) {
-              return prev.map(b => b.residentId === data.residentId ? data : b);
-            }
-            return [...prev, data];
+        socket.on('lockdown_status_changed', (payload) => {
+          setLockdown(payload.lockdown);
+        });
+
+        if (userRole === 'admin') {
+          socket.on('distress_alert', (data) => {
+            setDistressBanners(prev => {
+              const exists = prev.some(b => b.residentId === data.residentId);
+              if (exists) {
+                return prev.map(b => b.residentId === data.residentId ? data : b);
+              }
+              return [...prev, data];
+            });
+            playAlarmSound();
           });
-          playAlarmSound();
-        });
 
-        socket.on('distress_resolved', (data) => {
-          setDistressBanners(prev => prev.filter(b => b.residentId !== data.residentId));
-        });
+          socket.on('distress_resolved', (data) => {
+            setDistressBanners(prev => prev.filter(b => b.residentId !== data.residentId));
+          });
+        }
       }
 
       return () => {
-        socket.off('new_notification');
-        if (userRole === 'admin') {
-          socket.off('distress_alert');
-          socket.off('distress_resolved');
+        if (socket) {
+          socket.off('new_notification');
+          socket.off('lockdown_status_changed');
+          if (userRole === 'admin') {
+            socket.off('distress_alert');
+            socket.off('distress_resolved');
+          }
         }
         disconnectSocket();
       };
@@ -388,15 +425,15 @@ export default function Layout({ children }) {
               width: '36px', 
               height: '36px', 
               borderRadius: '50%', 
-              background: userRole === 'admin' ? 'linear-gradient(135deg, #a855f7, #6366f1)' : userRole === 'security' ? 'linear-gradient(135deg, #f43f5e, #e11d48)' : 'linear-gradient(135deg, #10b981, #6366f1)', 
+              background: userRole === 'admin' ? 'linear-gradient(135deg, #a855f7, #6366f1)' : userRole === 'security' ? 'linear-gradient(135deg, #f43f5e, #e11d48)' : (AVATAR_MAP[avatar]?.bg || 'linear-gradient(135deg, #10b981, #6366f1)'), 
               color: 'white', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
               fontWeight: 'bold',
-              fontSize: '0.85rem'
+              fontSize: userRole === 'resident' ? '1.15rem' : '0.85rem'
             }}>
-              {userRole === 'admin' ? 'AD' : userRole === 'security' ? 'SE' : 'RS'}
+              {userRole === 'admin' ? 'AD' : userRole === 'security' ? 'SE' : (AVATAR_MAP[avatar]?.emoji || 'RS')}
             </div>
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: '0.875rem', fontWeight: '700', color: 'var(--text-main)', lineHeight: 1.2 }}>
@@ -454,6 +491,25 @@ export default function Layout({ children }) {
 
         <main className="content-frame">
           <div className="app-container">
+            {lockdown && (
+              <div style={{
+                backgroundColor: 'var(--accent)',
+                color: 'white',
+                padding: '12px 20px',
+                borderRadius: '12px',
+                marginBottom: '24px',
+                fontWeight: '800',
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                boxShadow: '0 4px 12px rgba(244, 63, 94, 0.4)',
+                animation: 'pulse 2s infinite'
+              }}>
+                <ShieldAlert size={18} />
+                <span>⚠️ EMERGENCY LOCKDOWN ACTIVE: ALL ENTRY PERMITS SUSPENDED</span>
+              </div>
+            )}
             {children}
           </div>
         </main>

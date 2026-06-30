@@ -10,11 +10,13 @@ import {
   MapPin,
   X
 } from 'lucide-react';
-import { residentApi, visitorApi, notificationApi } from '../services/api';
+import { residentApi, visitorApi, notificationApi, getUserFromToken } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { getSocket } from '../services/socket';
 
 export default function Dashboard() {
+  const user = getUserFromToken();
+  const userRole = user ? user.role : 'admin';
   const toast = useToast();
   const [data, setData] = useState({
     activeVisitors: 0,
@@ -22,6 +24,8 @@ export default function Dashboard() {
     pendingAlerts: 0,
     recentVisitors: []
   });
+  const [lockdown, setLockdown] = useState(false);
+  const [hourlyData, setHourlyData] = useState([0, 0, 0, 0, 0, 0, 0]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -65,16 +69,22 @@ export default function Dashboard() {
         });
       };
 
+      const handleLockdownChange = (payload) => {
+        setLockdown(payload.lockdown);
+      };
+
       socket.on('distress_alert', handleDistressChange);
       socket.on('distress_resolved', handleDistressChange);
       socket.on('visitor_approval_changed', handleVisitorChange);
       socket.on('visitor_check_status', handleVisitorChange);
+      socket.on('lockdown_status_changed', handleLockdownChange);
 
       return () => {
         socket.off('distress_alert', handleDistressChange);
         socket.off('distress_resolved', handleDistressChange);
         socket.off('visitor_approval_changed', handleVisitorChange);
         socket.off('visitor_check_status', handleVisitorChange);
+        socket.off('lockdown_status_changed', handleLockdownChange);
       };
     }
   }, []);
@@ -89,6 +99,9 @@ export default function Dashboard() {
       try {
         const residents = await residentApi.getAll();
         const visitorsList = await visitorApi.getAll();
+        const lockdownStatus = await visitorApi.getLockdownStatus();
+        
+        setLockdown(lockdownStatus.lockdown);
 
         const activeVisitors = visitorsList.filter(v => v.status === 'Checked In').length;
 
@@ -98,6 +111,21 @@ export default function Dashboard() {
             pendingAlerts += 1;
           }
         });
+
+        const buckets = [0, 0, 0, 0, 0, 0, 0];
+        visitorsList.forEach(v => {
+          if (v.checkedInAt) {
+            const hr = new Date(v.checkedInAt).getHours();
+            if (hr >= 8 && hr < 10) buckets[0]++;
+            else if (hr >= 10 && hr < 12) buckets[1]++;
+            else if (hr >= 12 && hr < 14) buckets[2]++;
+            else if (hr >= 14 && hr < 16) buckets[3]++;
+            else if (hr >= 16 && hr < 18) buckets[4]++;
+            else if (hr >= 18 && hr < 20) buckets[5]++;
+            else if (hr >= 20 && hr < 22) buckets[6]++;
+          }
+        });
+        setHourlyData(buckets);
 
         const recent = visitorsList.slice(0, 4);
 
@@ -115,6 +143,17 @@ export default function Dashboard() {
     };
     loadData();
   }, []);
+
+  const handleToggleLockdown = async () => {
+    try {
+      const nextLockdown = !lockdown;
+      const res = await visitorApi.toggleLockdown(nextLockdown);
+      setLockdown(res.lockdown);
+      toast.success(res.lockdown ? 'Emergency lockdown activated!' : 'Lockdown deactivated.');
+    } catch (err) {
+      toast.error('Failed to update lockdown status.');
+    }
+  };
 
   const stats = [
     {
@@ -181,6 +220,35 @@ export default function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="content-card" style={{ padding: '24px' }}>
+        <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px' }}>
+          Busiest Entry Hours Analytics
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: '200px', padding: '10px 20px', borderBottom: '1.5px solid var(--border)', gap: '15px' }}>
+            {['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00', '18:00-20:00', '20:00-22:00'].map((label, idx) => {
+              const val = hourlyData[idx] || 0;
+              const maxVal = Math.max(...hourlyData, 1);
+              const heightPct = (val / maxVal) * 100;
+              return (
+                <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', height: '100%', justifyContent: 'flex-end' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary)' }}>{val}</span>
+                  <div style={{
+                    width: '100%',
+                    height: `${heightPct}%`,
+                    minHeight: val > 0 ? '8px' : '2px',
+                    background: 'linear-gradient(to top, var(--primary), var(--primary-hover))',
+                    borderRadius: '6px 6px 0 0',
+                    transition: 'height 0.5s ease-out'
+                  }} />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div style={{
@@ -367,6 +435,31 @@ export default function Dashboard() {
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>Broadcast message to all tablet guards</div>
                 </div>
               </button>
+
+              {userRole === 'admin' && (
+                <button
+                  onClick={handleToggleLockdown}
+                  className="btn-global"
+                  style={{
+                    justifyContent: 'flex-start',
+                    backgroundColor: lockdown ? 'var(--accent-light)' : 'var(--success-light)',
+                    color: lockdown ? 'var(--accent)' : 'var(--success)',
+                    border: lockdown ? '1px solid rgba(244, 63, 94, 0.15)' : '1px solid var(--success-border)',
+                    width: '100%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <ShieldCheck size={18} />
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>
+                      {lockdown ? 'Deactivate Lockdown' : 'Emergency Lockdown'}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                      {lockdown ? 'Resume gate operations' : 'Instantly suspend all entries'}
+                    </div>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
 

@@ -12,7 +12,7 @@ import {
   LogIn,
   X 
 } from 'lucide-react';
-import { visitorApi } from '../services/api';
+import { visitorApi, getUserFromToken } from '../services/api';
 import { getSocket } from '../services/socket';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
@@ -64,10 +64,23 @@ export default function Visitors() {
   });
   const [selectedVisitor, setSelectedVisitor] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-  const [userRole] = useState(() => localStorage.getItem('gatepass_role') || 'admin');
+  const user = getUserFromToken();
+  const userRole = user ? user.role : 'admin';
   const [verifyFlatNo, setVerifyFlatNo] = useState('');
   const [verifyPasscode, setVerifyPasscode] = useState('');
   const [verifyingPasscode, setVerifyingPasscode] = useState(false);
+  const [blocklist, setBlocklist] = useState([]);
+  const [isBlocklistOpen, setIsBlocklistOpen] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
+  const [targetBlockMobile, setTargetBlockMobile] = useState('');
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+
+  const fetchBlocklist = async () => {
+    try {
+      const data = await visitorApi.getBlocklist();
+      setBlocklist(data);
+    } catch (err) {}
+  };
 
   const fetchVisitors = async (query = '') => {
     setLoading(true);
@@ -84,7 +97,10 @@ export default function Visitors() {
   useEffect(() => {
     document.title = 'Visitors | GatePass Pro';
     fetchVisitors();
-  }, []);
+    if (userRole === 'admin') {
+      fetchBlocklist();
+    }
+  }, [userRole]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -182,6 +198,32 @@ export default function Visitors() {
     }
   };
 
+  const handleBlockVisitor = async (e) => {
+    e.preventDefault();
+    try {
+      await visitorApi.addBlocklist(targetBlockMobile, blockReason);
+      toast.success('Mobile number blacklisted successfully.');
+      setIsBlockModalOpen(false);
+      setBlockReason('');
+      setTargetBlockMobile('');
+      fetchBlocklist();
+      fetchVisitors(searchQuery);
+    } catch (err) {
+      toast.error(err.message || 'Failed to blacklist visitor.');
+    }
+  };
+
+  const handleUnblockVisitor = async (mobile) => {
+    try {
+      await visitorApi.removeBlocklist(mobile);
+      toast.success('Visitor removed from blacklist.');
+      fetchBlocklist();
+      fetchVisitors(searchQuery);
+    } catch (err) {
+      toast.error('Failed to whitelist visitor.');
+    }
+  };
+
   const handleExportCSV = () => {
     if (visitors.length === 0) {
       toast.warning('No visitor logs to export.');
@@ -228,9 +270,14 @@ export default function Visitors() {
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           {userRole === 'admin' && (
-            <FormButton onClick={handleExportCSV} variant="secondary">
-              <span>Export to CSV</span>
-            </FormButton>
+            <>
+              <FormButton onClick={handleExportCSV} variant="secondary">
+                <span>Export to CSV</span>
+              </FormButton>
+              <FormButton onClick={() => setIsBlocklistOpen(true)} variant="secondary">
+                <span>Manage Blocklist</span>
+              </FormButton>
+            </>
           )}
           <FormButton onClick={() => setIsAddOpen(true)} variant="primary">
             <span>New Entry Pass</span>
@@ -355,19 +402,21 @@ export default function Visitors() {
                         fontSize: '0.75rem',
                         fontWeight: '700',
                         backgroundColor: 
+                          visitor.isOverdue ? 'var(--accent-light)' :
                           visitor.status === 'Checked In' ? 'var(--success-light)' : 
                           visitor.status === 'Checked Out' ? 'var(--border)' : 
                           visitor.status === 'Approved' ? 'var(--primary-light)' : 
                           visitor.status === 'Rejected' ? 'var(--accent-light)' : 
                           'var(--warning-light)',
                         color: 
+                          visitor.isOverdue ? 'var(--accent)' :
                           visitor.status === 'Checked In' ? 'var(--success)' : 
                           visitor.status === 'Checked Out' ? 'var(--text-muted)' : 
                           visitor.status === 'Approved' ? 'var(--primary)' : 
                           visitor.status === 'Rejected' ? 'var(--accent)' : 
                           'var(--warning)'
                       }}>
-                        {visitor.status}
+                        {visitor.isOverdue ? 'Overdue' : visitor.status}
                       </span>
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right' }}>
@@ -398,6 +447,18 @@ export default function Visitors() {
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '6px' }}
                           >
                             <Trash2 size={16} />
+                          </button>
+                        )}
+                        {userRole === 'admin' && visitor.mobile && (
+                          <button
+                            onClick={() => {
+                              setTargetBlockMobile(visitor.mobile);
+                              setIsBlockModalOpen(true);
+                            }}
+                            title="Block Actor"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', padding: '6px' }}
+                          >
+                            <ShieldAlert size={16} />
                           </button>
                         )}
                       </div>
@@ -686,6 +747,130 @@ export default function Visitors() {
                 Delete
               </FormButton>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isBlockModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1200,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '90%',
+            maxWidth: '400px',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
+            padding: '30px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)' }}>Blacklist Visitor</h3>
+            <form onSubmit={handleBlockVisitor} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)' }}>Mobile Number</label>
+                <div style={{ padding: '10px 0', fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>{targetBlockMobile}</div>
+              </div>
+              <FormInput
+                label="Blacklist Reason"
+                placeholder="e.g. Unruly behavior, package theft"
+                value={blockReason}
+                onChange={(e) => setBlockReason(e.target.value)}
+                required
+              />
+              <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                <FormButton type="button" onClick={() => { setIsBlockModalOpen(false); setTargetBlockMobile(''); setBlockReason(''); }} variant="secondary" style={{ flex: 1 }}>
+                  Cancel
+                </FormButton>
+                <FormButton type="submit" variant="primary" style={{ flex: 1, backgroundColor: 'var(--accent)' }}>
+                  Blacklist
+                </FormButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isBlocklistOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1150,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '90%',
+            maxWidth: '560px',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-premium)',
+            padding: '30px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>Blocked Visitor Directory</h3>
+              <button onClick={() => setIsBlocklistOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+            </div>
+            {blocklist.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                No visitors are currently blacklisted.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {blocklist.map((b) => (
+                  <div key={b._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'rgba(0,0,0,0.01)' }}>
+                    <div>
+                      <div style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '0.95rem' }}>{b.mobile}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--accent)' }}>Reason: {b.reason || 'Not specified'}</div>
+                    </div>
+                    <button
+                      onClick={() => handleUnblockVisitor(b.mobile)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--success)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--success)',
+                        fontWeight: '700',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Whitelist
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <FormButton onClick={() => setIsBlocklistOpen(false)} variant="secondary" style={{ width: '100%' }}>
+              Close List
+            </FormButton>
           </div>
         </div>
       )}

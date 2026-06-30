@@ -11,9 +11,11 @@ import Vehicles from './pages/Vehicles';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastProvider } from './context/ToastContext';
+import { getUserFromToken } from './services/api';
 
 function HomeRedirect() {
-  const role = localStorage.getItem('gatepass_role') || 'admin';
+  const user = getUserFromToken();
+  const role = user ? user.role : 'admin';
   if (role === 'resident') {
     return <Navigate to="/resident-dashboard" replace />;
   }

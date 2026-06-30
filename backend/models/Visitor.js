@@ -39,6 +39,14 @@ const visitorSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Resident'
+  },
+  isBlacklisted: {
+    type: Boolean,
+    default: false
+  },
   time: {
     type: Date,
     default: Date.now

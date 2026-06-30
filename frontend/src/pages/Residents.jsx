@@ -12,13 +12,14 @@ import {
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
-import { residentApi } from '../services/api';
+import { residentApi, getUserFromToken } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
 export default function Residents() {
   const toast = useToast();
-  const userRole = localStorage.getItem('gatepass_role') || 'admin';
+  const user = getUserFromToken();
+  const userRole = user ? user.role : 'admin';
   const [residents, setResidents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);

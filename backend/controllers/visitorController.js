@@ -25,8 +25,13 @@ const getVisitors = async (req, res) => {
       Visitor.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
       Visitor.countDocuments(query)
     ]);
+    const visitorsWithOverdue = visitors.map(v => {
+      const vObj = v.toObject();
+      vObj.isOverdue = v.status === 'Checked In' && v.checkedInAt && (Date.now() - new Date(v.checkedInAt).getTime() > 24 * 60 * 60 * 1000);
+      return vObj;
+    });
     res.status(200).json({
-      visitors,
+      visitors: visitorsWithOverdue,
       total,
       page: pageNum,
       pages: Math.ceil(total / limitNum)
@@ -41,6 +46,40 @@ const addVisitor = async (req, res) => {
     const { name, type, mobile, flatNo, status, purpose, vehicleNumber } = req.body;
     if (!name || !type || !flatNo) {
       return res.status(400).json({ message: 'Name, type, and flat number are required' });
+    }
+
+    const SystemSetting = require('../models/SystemSetting');
+    const isLockdown = await SystemSetting.findOne({ key: 'lockdown' });
+    if (isLockdown && isLockdown.value === true) {
+      return res.status(403).json({ message: 'Emergency Lockdown Active: All entry permits suspended.' });
+    }
+
+    const Blocklist = require('../models/Blocklist');
+    const isBlocked = await Blocklist.findOne({ mobile });
+    if (isBlocked) {
+      return res.status(400).json({ message: `Visitor mobile ${mobile} is blacklisted: ${isBlocked.reason || 'Security Alert'}` });
+    }
+
+    if (/[<>]/.test(name) || (vehicleNumber && /[<>]/.test(vehicleNumber)) || (purpose && /[<>]/ .test(purpose))) {
+      return res.status(400).json({ message: 'Input contains invalid HTML characters.' });
+    }
+    if (name.length < 2 || name.length > 50) {
+      return res.status(400).json({ message: 'Visitor name must be between 2 and 50 characters.' });
+    }
+    if (!['Guest', 'Delivery', 'Cab', 'Maintenance', 'Other'].includes(type)) {
+      return res.status(400).json({ message: 'Invalid visitor type.' });
+    }
+    if (!/^\d{8,15}$/.test(mobile)) {
+      return res.status(400).json({ message: 'Mobile number must contain 8 to 15 digits.' });
+    }
+    if (!/^[a-zA-Z]+-\d+$/.test(flatNo.trim())) {
+      return res.status(400).json({ message: 'Flat number must be in Alphabet-number format (e.g. A-102).' });
+    }
+    if (vehicleNumber && vehicleNumber.length > 15) {
+      return res.status(400).json({ message: 'Vehicle number must be under 15 characters.' });
+    }
+    if (purpose && purpose.length > 100) {
+      return res.status(400).json({ message: 'Purpose description must be under 100 characters.' });
     }
     const generatedPasscode = Math.floor(100000 + Math.random() * 900000).toString();
     const visitor = await Visitor.create({
@@ -76,6 +115,11 @@ const updateVisitor = async (req, res) => {
     }
     if (status) {
       visitor.status = status;
+      if (status === 'Approved' || status === 'Rejected') {
+        if (req.user.role === 'resident') {
+          visitor.approvedBy = req.user.residentId;
+        }
+      }
       if (status === 'Checked In') {
         visitor.checkedInAt = new Date();
         try {
@@ -219,10 +263,114 @@ const verifyPasscode = async (req, res) => {
   }
 };
 
+const exportVisitorsCSV = async (req, res) => {
+  try {
+    const visitors = await Visitor.find({}).sort({ createdAt: -1 });
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=visitors_log.csv');
+    
+    let csv = 'Name,Type,Mobile,Flat Number,Status,Purpose,Vehicle Number,Passcode,Checked In,Checked Out,Created At\n';
+    visitors.forEach(v => {
+      const checkedInStr = v.checkedInAt ? v.checkedInAt.toISOString() : '';
+      const checkedOutStr = v.checkedOutAt ? v.checkedOutAt.toISOString() : '';
+      const createdAtStr = v.createdAt ? v.createdAt.toISOString() : '';
+      csv += `"${v.name}","${v.type}","${v.mobile}","${v.flatNo}","${v.status}","${v.purpose || ''}","${v.vehicleNumber || ''}","[MASKED]","${checkedInStr}","${checkedOutStr}","${createdAtStr}"\n`;
+    });
+    res.status(200).send(csv);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const toggleLockdown = async (req, res) => {
+  try {
+    const { lockdown } = req.body;
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const SystemSetting = require('../models/SystemSetting');
+    let setting = await SystemSetting.findOne({ key: 'lockdown' });
+    if (!setting) {
+      setting = await SystemSetting.create({ key: 'lockdown', value: false });
+    }
+    setting.value = lockdown;
+    await setting.save();
+
+    if (req.io) {
+      req.io.emit('lockdown_status_changed', { lockdown });
+    }
+
+    res.status(200).json({ lockdown: setting.value });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getLockdownStatus = async (req, res) => {
+  try {
+    const SystemSetting = require('../models/SystemSetting');
+    const setting = await SystemSetting.findOne({ key: 'lockdown' });
+    res.status(200).json({ lockdown: setting ? setting.value : false });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const addBlocklist = async (req, res) => {
+  try {
+    const { mobile, reason } = req.body;
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const Blocklist = require('../models/Blocklist');
+    let blocked = await Blocklist.findOne({ mobile });
+    if (blocked) {
+      return res.status(400).json({ message: 'Mobile number is already blacklisted.' });
+    }
+    blocked = await Blocklist.create({ mobile, reason });
+    res.status(201).json(blocked);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getBlocklist = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const Blocklist = require('../models/Blocklist');
+    const list = await Blocklist.find({}).sort({ createdAt: -1 });
+    res.status(200).json(list);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const removeBlocklist = async (req, res) => {
+  try {
+    const { mobile } = req.params;
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const Blocklist = require('../models/Blocklist');
+    await Blocklist.deleteOne({ mobile });
+    res.status(200).json({ message: 'Mobile number removed from blocklist.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getVisitors,
   addVisitor,
   updateVisitor,
   deleteVisitor,
-  verifyPasscode
+  verifyPasscode,
+  exportVisitorsCSV,
+  toggleLockdown,
+  getLockdownStatus,
+  addBlocklist,
+  getBlocklist,
+  removeBlocklist
 };

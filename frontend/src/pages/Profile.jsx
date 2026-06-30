@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { residentApi } from '../services/api';
+import { residentApi, getUserFromToken } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
@@ -26,9 +26,11 @@ export default function Profile() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const userRole = localStorage.getItem('gatepass_role') || 'admin';
+  const user = getUserFromToken();
+  const userRole = user ? user.role : 'admin';
   const residentId = localStorage.getItem('gatepass_resident_id');
   const residentEmail = localStorage.getItem('gatepass_resident_email');
+  const [selectedAvatar, setSelectedAvatar] = useState('avatar1');
 
   const fetchProfile = async () => {
     if (userRole === 'admin' || userRole === 'security') {
@@ -59,6 +61,9 @@ export default function Profile() {
         if (matched) {
           if (!matched.communityId) {
             matched.communityId = Math.floor(10000 + Math.random() * 90000).toString();
+          }
+          if (matched.avatar) {
+            setSelectedAvatar(matched.avatar);
           }
           setProfile(matched);
           setFormData({
@@ -91,7 +96,8 @@ export default function Profile() {
         setProfile(updated);
       } else {
         const updated = await residentApi.update(profile._id, {
-          ...formData
+          ...formData,
+          avatar: selectedAvatar
         });
         setProfile(updated);
       }
@@ -245,6 +251,45 @@ export default function Profile() {
             </h3>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {userRole === 'resident' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+                    Choose Profile Avatar
+                  </label>
+                  <div style={{ display: 'flex', gap: '15px' }}>
+                    {[
+                      { key: 'avatar1', emoji: '👤', label: 'Default' },
+                      { key: 'avatar2', emoji: '👨‍💼', label: 'Business Male' },
+                      { key: 'avatar3', emoji: '👩‍💼', label: 'Business Female' },
+                      { key: 'avatar4', emoji: '🧑‍💻', label: 'Coder' }
+                    ].map(av => (
+                      <button
+                        key={av.key}
+                        type="button"
+                        onClick={() => setSelectedAvatar(av.key)}
+                        style={{
+                          width: '64px',
+                          height: '64px',
+                          borderRadius: '16px',
+                          border: selectedAvatar === av.key ? '3px solid var(--primary)' : '2px solid var(--border)',
+                          backgroundColor: 'var(--bg-card)',
+                          fontSize: '1.75rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'var(--transition)',
+                          transform: selectedAvatar === av.key ? 'scale(1.05)' : 'none',
+                          boxShadow: selectedAvatar === av.key ? 'var(--shadow-premium)' : 'none'
+                        }}
+                        title={av.label}
+                      >
+                        {av.emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <FormInput
                 label="Bio"
                 value={formData.bio}

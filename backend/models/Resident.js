@@ -81,6 +81,10 @@ const residentSchema = new mongoose.Schema({
   vehicles: {
     type: [String],
     default: []
+  },
+  avatar: {
+    type: String,
+    default: 'avatar1'
   }
 }, {
   timestamps: true

@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
+import { getUserFromToken } from '../services/api';
 
 export default function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('gatepass_token');
-  const isAuthenticated = token && token !== 'true';
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  const user = getUserFromToken();
+  return user ? children : <Navigate to="/login" replace />;
 }
