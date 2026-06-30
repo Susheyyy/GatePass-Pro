@@ -214,7 +214,10 @@ export const residentApi = {
       
       list.push(newResident);
       saveLocalResidents(list);
-      return newResident;
+      const responseObj = { ...newResident };
+      delete responseObj.otp;
+      delete responseObj.password;
+      return responseObj;
     }
   },
 
@@ -291,7 +294,10 @@ export const residentApi = {
           list[index] = { ...list[index], ...residentData };
         }
         saveLocalResidents(list);
-        return list[index];
+        const responseObj = { ...list[index] };
+        delete responseObj.otp;
+        delete responseObj.password;
+        return responseObj;
       }
       throw new Error('Resident not found in local storage');
     }
@@ -373,6 +379,74 @@ export const residentApi = {
         return matched;
       }
       throw new Error('Resident not found');
+    }
+  },
+
+  changeSystemPassword: async (currentPassword, newPassword) => {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/system/change-password`, { currentPassword, newPassword });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      const role = localStorage.getItem('gatepass_role');
+      if (role === 'admin') {
+        const currentAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
+        if (currentPassword !== currentAdminPass) {
+          throw new Error('Incorrect current password.');
+        }
+        localStorage.setItem('gatepass_admin_password', newPassword);
+      } else if (role === 'security') {
+        const currentSecurityPass = localStorage.getItem('gatepass_security_password') || 'security123';
+        if (currentPassword !== currentSecurityPass) {
+          throw new Error('Incorrect current password.');
+        }
+        localStorage.setItem('gatepass_security_password', newPassword);
+      }
+      return { message: 'Password updated locally in offline mode' };
+    }
+  },
+
+  getSystemProfile: async (role) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/system/profile`, { params: { role } });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      return role === 'admin' ? {
+        name: 'System Administrator',
+        email: 'admin@gatepass.com',
+        role: 'Admin',
+        mobile: 'N/A',
+        communityId: 'ADMIN',
+        bio: 'Main system administrator for GatePass Pro security controls.',
+        location: 'Central Security Tower',
+        address: 'Gate Control Room'
+      } : {
+        name: 'Security Desk Officer',
+        email: 'security@gatepass.com',
+        role: 'Security',
+        mobile: 'N/A',
+        communityId: 'SECURITY',
+        bio: 'Gate supervisor for community guest validation and check-ins.',
+        location: 'Main Entry Gate 1',
+        address: 'Security Cabin'
+      };
+    }
+  },
+
+  updateSystemProfile: async (profileData) => {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/system/profile`, profileData);
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Server error');
+      }
+      return profileData;
     }
   }
 };
@@ -719,8 +793,13 @@ export const notificationApi = {
     } catch (error) {
       console.warn('Backend offline, clearing notifications in LocalStorage:', error.message);
       const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
-      const recipientValue = role === 'admin' ? 'admin' : flatNo;
-      const filtered = list.filter(n => n.recipient !== 'all' && n.recipient !== recipientValue);
+      const filtered = list.filter(n => {
+        if (role === 'admin') {
+          return n.recipient !== 'admin';
+        } else {
+          return n.recipient !== flatNo;
+        }
+      });
       localStorage.setItem('gatepass_notifications', JSON.stringify(filtered));
       return { message: 'Notifications cleared successfully' };
     }

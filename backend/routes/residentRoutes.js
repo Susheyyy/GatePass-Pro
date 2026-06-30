@@ -10,21 +10,29 @@ const {
   resetForgotPassword,
   loginResident,
   bulkCreateResidents,
-  getResidentById
+  getResidentById,
+  changeSystemPassword,
+  getSystemProfile,
+  updateSystemProfile
 } = require('../controllers/residentController');
 
-const { loginLimiter } = require('../middleware/visitorLimiter');
+const { loginLimiter, registrationLimiter } = require('../middleware/visitorLimiter');
 
 const { protectRoute, restrictToRoles, authorizeResidentAccess } = require('../middleware/authMiddleware');
 
 router.route('/')
   .get(protectRoute, restrictToRoles('admin', 'resident'), getResidents)
-  .post(addResident);
+  .post(registrationLimiter, addResident);
 
 router.post('/bulk', protectRoute, restrictToRoles('admin'), bulkCreateResidents);
 router.post('/login', loginLimiter, loginResident);
 router.post('/forgot-password', loginLimiter, forgotPassword);
 router.post('/reset-password', resetForgotPassword);
+
+router.put('/system/change-password', protectRoute, changeSystemPassword);
+router.route('/system/profile')
+  .get(protectRoute, getSystemProfile)
+  .put(protectRoute, updateSystemProfile);
 
 router.route('/:id')
   .get(protectRoute, authorizeResidentAccess, getResidentById)

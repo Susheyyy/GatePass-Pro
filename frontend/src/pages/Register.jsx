@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, User, Phone, Home, Users, ArrowLeft } from 'lucide-react';
 import { residentApi } from '../services/api';
@@ -16,6 +16,22 @@ export default function Register() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [honeypot, setHoneypot] = useState('');
+  const [captchaQuestion, setCaptchaQuestion] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaInput, setCaptchaInput] = useState('');
+
+  const generateCaptcha = () => {
+    const num1 = Math.floor(Math.random() * 9) + 1;
+    const num2 = Math.floor(Math.random() * 9) + 1;
+    setCaptchaQuestion(`What is ${num1} + ${num2}?`);
+    setCaptchaAnswer((num1 + num2).toString());
+  };
+
+  useEffect(() => {
+    document.title = 'Register | GatePass Pro';
+    generateCaptcha();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -28,6 +44,18 @@ export default function Register() {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+
+    if (honeypot) {
+      setIsLoading(false);
+      return;
+    }
+
+    if (captchaInput.trim() !== captchaAnswer) {
+      toast.warning('Incorrect security verification answer.');
+      setIsLoading(false);
+      generateCaptcha();
+      return;
+    }
 
     if (!/^[a-zA-Z]+-\d+$/.test(formData.flatNo.trim())) {
       toast.warning('Flat Number must be in Alphabet-number format (e.g. A-102, B-405)');
@@ -252,6 +280,42 @@ export default function Register() {
                     }}
                   />
                   <Users size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-light)' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'none' }}>
+                <input
+                  type="text"
+                  name="website"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Security Verification: {captchaQuestion} *
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    placeholder="Enter sum answer"
+                    required
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      backgroundColor: 'white'
+                    }}
+                  />
                 </div>
               </div>
 

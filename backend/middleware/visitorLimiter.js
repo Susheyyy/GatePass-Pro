@@ -16,4 +16,12 @@ const loginLimiter = rateLimit({
   legacyHeaders: false
 });
 
-module.exports = { passcodeLimiter, loginLimiter };
+const registrationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { message: 'Too many registration requests from this IP. Please try again after an hour.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+module.exports = { passcodeLimiter, loginLimiter, registrationLimiter };

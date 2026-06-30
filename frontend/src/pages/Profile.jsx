@@ -31,48 +31,31 @@ export default function Profile() {
   const residentEmail = localStorage.getItem('gatepass_resident_email');
 
   const fetchProfile = async () => {
-    if (userRole === 'admin') {
-      setProfile({
-        name: 'System Administrator',
-        email: 'admin@gatepass.com',
-        role: 'Admin',
-        mobile: 'N/A',
-        communityId: 'ADMIN',
-        bio: 'Main system administrator for GatePass Pro security controls.',
-        location: 'Central Security Tower',
-        address: 'Gate Control Room'
-      });
-      setFormData({
-        bio: 'Main system administrator for GatePass Pro security controls.',
-        location: 'Central Security Tower',
-        address: 'Gate Control Room',
-        mobile: 'N/A',
-        gmail: 'admin@gatepass.com'
-      });
-      setLoading(false);
-    } else if (userRole === 'security') {
-      setProfile({
-        name: 'Security Desk Officer',
-        email: 'security@gatepass.com',
-        role: 'Security',
-        mobile: 'N/A',
-        communityId: 'SECURITY',
-        bio: 'Gate supervisor for community guest validation and check-ins.',
-        location: 'Main Entry Gate 1',
-        address: 'Security Cabin'
-      });
-      setFormData({
-        bio: 'Gate supervisor for community guest validation and check-ins.',
-        location: 'Main Entry Gate 1',
-        address: 'Security Cabin',
-        mobile: 'N/A',
-        gmail: 'security@gatepass.com'
-      });
-      setLoading(false);
+    if (userRole === 'admin' || userRole === 'security') {
+      try {
+        const data = await residentApi.getSystemProfile(userRole);
+        setProfile(data);
+        setFormData({
+          bio: data.bio,
+          location: data.location,
+          address: data.address,
+          mobile: data.mobile,
+          gmail: data.email
+        });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     } else {
       try {
-        const list = await residentApi.getAll();
-        const matched = list.find(r => r._id === residentId || r.email.toLowerCase() === residentEmail?.toLowerCase());
+        let matched = null;
+        if (residentId) {
+          matched = await residentApi.getById(residentId);
+        } else {
+          const list = await residentApi.getAll();
+          matched = list.find(r => r.email.toLowerCase() === residentEmail?.toLowerCase());
+        }
         if (matched) {
           if (!matched.communityId) {
             matched.communityId = Math.floor(10000 + Math.random() * 90000).toString();
@@ -95,18 +78,23 @@ export default function Profile() {
   };
 
   useEffect(() => {
+    document.title = 'Profile | GatePass Pro';
     fetchProfile();
   }, [residentId, residentEmail, userRole]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (userRole === 'admin') return;
     setUpdating(true);
     try {
-      const updated = await residentApi.update(profile._id, {
-        ...formData
-      });
-      setProfile(updated);
+      if (userRole === 'admin' || userRole === 'security') {
+        const updated = await residentApi.updateSystemProfile(formData);
+        setProfile(updated);
+      } else {
+        const updated = await residentApi.update(profile._id, {
+          ...formData
+        });
+        setProfile(updated);
+      }
       toast.success('Profile details updated successfully!');
     } catch (err) {
       toast.error('Failed to save profile details.');
@@ -145,24 +133,9 @@ export default function Profile() {
     }
     setChangingPassword(true);
     try {
-      if (userRole === 'admin') {
-        const currentAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
-        if (passwordData.currentPassword !== currentAdminPass) {
-          toast.error('Incorrect current password.');
-          setChangingPassword(false);
-          return;
-        }
-        localStorage.setItem('gatepass_admin_password', passwordData.newPassword);
-        toast.success('Admin password updated successfully!');
-      } else if (userRole === 'security') {
-        const currentSecurityPass = localStorage.getItem('gatepass_security_password') || 'security123';
-        if (passwordData.currentPassword !== currentSecurityPass) {
-          toast.error('Incorrect current password.');
-          setChangingPassword(false);
-          return;
-        }
-        localStorage.setItem('gatepass_security_password', passwordData.newPassword);
-        toast.success('Security password updated successfully!');
+      if (userRole === 'admin' || userRole === 'security') {
+        await residentApi.changeSystemPassword(passwordData.currentPassword, passwordData.newPassword);
+        toast.success(`${userRole === 'admin' ? 'Admin' : 'Security'} password updated successfully!`);
       } else {
         if (otpSent && passwordData.otp) {
           const emailToReset = profile.gmail || profile.email;

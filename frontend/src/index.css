@@ -31,6 +31,24 @@
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-main: #0f0712;
+    --bg-card: #180d1d;
+    --text-main: #f5f0f6;
+    --text-muted: #94a3b8;
+    --text-light: #64748b;
+    --border: #2d1833;
+    --border-focus: #F7E493;
+    --primary-light: #320B35;
+    --primary-border: rgba(247, 228, 147, 0.2);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+    --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  }
+}
+
 
 
 * {
@@ -149,6 +167,26 @@ body {
 }
 
 .btn-success:hover {
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: white;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.btn-secondary:hover {
+  transform: translateY(-1px);
+  background-color: var(--bg-main);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: white;
+}
+
+.btn-danger:hover {
   transform: translateY(-1px);
 }
 

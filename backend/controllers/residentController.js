@@ -64,6 +64,28 @@ const addResident = async (req, res) => {
       return res.status(400).json({ message: 'Total Family Members must contain only digits' });
     }
 
+    if (isResidentAdding) {
+      const authHeader = req.headers['authorization'];
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authentication required to add co-residents' });
+      }
+      const token = authHeader.split(' ')[1];
+      const jwt = require('jsonwebtoken');
+      const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
+      let decoded;
+      try {
+        decoded = jwt.verify(token, jwtSecret);
+      } catch (err) {
+        return res.status(401).json({ message: 'Invalid or expired token' });
+      }
+      if (decoded.role !== 'resident') {
+        return res.status(403).json({ message: 'Forbidden: Only residents can add co-residents' });
+      }
+      if (decoded.flatNo !== flatNo) {
+        return res.status(403).json({ message: 'Forbidden: You can only add co-residents to your own flat' });
+      }
+    }
+
     const formattedGmail = gmail.trim().toLowerCase();
     const existingGmail = await Resident.findOne({ gmail: formattedGmail });
     if (existingGmail) {
@@ -133,7 +155,10 @@ const addResident = async (req, res) => {
     } catch (mailError) {
     }
     
-    res.status(201).json(resident);
+    const responseObj = resident.toObject();
+    delete responseObj.otp;
+    delete responseObj.password;
+    res.status(201).json(responseObj);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -438,8 +463,16 @@ const loginResident = async (req, res) => {
     const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
 
     if (formattedEmail === 'admin@gatepass.com') {
-      const currentAdminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-      if (password !== currentAdminPassword) {
+      const SystemCredential = require('../models/SystemCredential');
+      let adminCred = await SystemCredential.findOne({ role: 'admin' });
+      let isMatch = false;
+      if (adminCred) {
+        const bcrypt = require('bcryptjs');
+        isMatch = await bcrypt.compare(password, adminCred.password);
+      } else {
+        isMatch = (password === (process.env.ADMIN_PASSWORD || 'admin123'));
+      }
+      if (!isMatch) {
         return res.status(400).json({ message: 'Invalid password' });
       }
       const token = jwt.sign({ role: 'admin', email: formattedEmail }, jwtSecret, { expiresIn: '1d' });
@@ -452,8 +485,16 @@ const loginResident = async (req, res) => {
     }
 
     if (formattedEmail === 'security@gatepass.com') {
-      const currentSecurityPassword = process.env.SECURITY_PASSWORD || 'security123';
-      if (password !== currentSecurityPassword) {
+      const SystemCredential = require('../models/SystemCredential');
+      let securityCred = await SystemCredential.findOne({ role: 'security' });
+      let isMatch = false;
+      if (securityCred) {
+        const bcrypt = require('bcryptjs');
+        isMatch = await bcrypt.compare(password, securityCred.password);
+      } else {
+        isMatch = (password === (process.env.SECURITY_PASSWORD || 'security123'));
+      }
+      if (!isMatch) {
         return res.status(400).json({ message: 'Invalid password' });
       }
       const token = jwt.sign({ role: 'security', email: formattedEmail }, jwtSecret, { expiresIn: '1d' });
@@ -510,6 +551,17 @@ const loginResident = async (req, res) => {
   }
 };
 
+const sanitizeFormula = (val) => {
+  if (typeof val === 'string') {
+    const clean = val.trim();
+    if (/^[=+\-@]/.test(clean)) {
+      return `'` + clean;
+    }
+    return clean;
+  }
+  return val;
+};
+
 const bulkCreateResidents = async (req, res) => {
   try {
     const { residents } = req.body;
@@ -527,34 +579,39 @@ const bulkCreateResidents = async (req, res) => {
         continue;
       }
 
-      if (!/^[a-zA-Z]+-\d+$/.test(flatNo.toString().trim())) {
+      const cleanFlatNo = sanitizeFormula(flatNo.toString());
+      const cleanName = sanitizeFormula(name.toString());
+      const cleanMobile = sanitizeFormula(mobile.toString());
+      const cleanGmail = sanitizeFormula(gmail.toString());
+
+      if (!/^[a-zA-Z]+-\d+$/.test(cleanFlatNo)) {
         errors.push(`Flat ${flatNo}: Invalid Flat Number format (must be Alphabet-number)`);
         continue;
       }
-      if (!/^\d+$/.test(mobile.toString().trim())) {
+      if (!/^\d+$/.test(cleanMobile)) {
         errors.push(`Flat ${flatNo}: Mobile Number must contain only digits`);
         continue;
       }
-      if (!/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(gmail.toString().trim())) {
+      if (!/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(cleanGmail)) {
         errors.push(`Flat ${flatNo}: Invalid Gmail Address provider`);
         continue;
       }
 
-      const formattedGmail = gmail.toString().trim().toLowerCase();
+      const formattedGmail = cleanGmail.toLowerCase();
       const existingGmail = await Resident.findOne({ gmail: formattedGmail });
       if (existingGmail) {
         errors.push(`Flat ${flatNo}: A resident with Gmail ${gmail} already exists`);
         continue;
       }
 
-      const existingFlat = await Resident.findOne({ flatNo: flatNo.toString().trim() });
+      const existingFlat = await Resident.findOne({ flatNo: cleanFlatNo });
       if (existingFlat) {
         errors.push(`Flat ${flatNo}: Already registered`);
         continue;
       }
 
-      const firstName = name.toString().trim().split(' ')[0].toLowerCase();
-      const flatClean = flatNo.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const firstName = cleanName.split(' ')[0].toLowerCase();
+      const flatClean = cleanFlatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
       let generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
       let emailExists = await Resident.findOne({ email: generatedEmail });
       let counter = 1;
@@ -568,9 +625,9 @@ const bulkCreateResidents = async (req, res) => {
       const generatedCommunityId = Math.floor(10000 + Math.random() * 90000).toString();
 
       const newResident = await Resident.create({
-        flatNo: flatNo.toString().trim(),
-        name: name.toString().trim(),
-        mobile: mobile.toString().trim(),
+        flatNo: cleanFlatNo,
+        name: cleanName,
+        mobile: cleanMobile,
         email: generatedEmail,
         gmail: formattedGmail,
         members: parseInt(members) || 1,
@@ -579,7 +636,7 @@ const bulkCreateResidents = async (req, res) => {
         isFirstLogin: true,
         communityId: generatedCommunityId,
         status: 'Approved',
-        address: `Flat ${flatNo}, GatePass Residency`
+        address: `Flat ${cleanFlatNo}, GatePass Residency`
       });
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -588,7 +645,7 @@ const bulkCreateResidents = async (req, res) => {
         from: process.env.SMTP_MAIL,
         to: formattedGmail,
         subject: 'GatePass Pro - Resident Account Created',
-        text: `Hello ${name},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
+        text: `Hello ${cleanName},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
       };
 
       try {
@@ -625,6 +682,104 @@ const getResidentById = async (req, res) => {
   }
 };
 
+const changeSystemPassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (req.user.role !== 'admin' && req.user.role !== 'security') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const SystemCredential = require('../models/SystemCredential');
+    let cred = await SystemCredential.findOne({ role: req.user.role });
+    const defaultPassword = req.user.role === 'admin' ? (process.env.ADMIN_PASSWORD || 'admin123') : (process.env.SECURITY_PASSWORD || 'security123');
+    
+    const bcrypt = require('bcryptjs');
+    let isMatch = false;
+    if (cred) {
+      isMatch = await bcrypt.compare(currentPassword, cred.password);
+    } else {
+      isMatch = (currentPassword === defaultPassword);
+    }
+
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Incorrect current password' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    if (cred) {
+      cred.password = hashedPassword;
+      await cred.save();
+    } else {
+      await SystemCredential.create({
+        role: req.user.role,
+        password: hashedPassword
+      });
+    }
+    res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getSystemProfile = async (req, res) => {
+  try {
+    const { role } = req.query;
+    if (role !== 'admin' && role !== 'security') {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+    const SystemProfile = require('../models/SystemProfile');
+    let profile = await SystemProfile.findOne({ role });
+    if (!profile) {
+      const defaultProfile = role === 'admin' ? {
+        role: 'admin',
+        name: 'System Administrator',
+        email: 'admin@gatepass.com',
+        mobile: 'N/A',
+        communityId: 'ADMIN',
+        bio: 'Main system administrator for GatePass Pro security controls.',
+        location: 'Central Security Tower',
+        address: 'Gate Control Room'
+      } : {
+        role: 'security',
+        name: 'Security Desk Officer',
+        email: 'security@gatepass.com',
+        mobile: 'N/A',
+        communityId: 'SECURITY',
+        bio: 'Gate supervisor for community guest validation and check-ins.',
+        location: 'Main Entry Gate 1',
+        address: 'Security Cabin'
+      };
+      profile = await SystemProfile.create(defaultProfile);
+    }
+    res.status(200).json(profile);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const updateSystemProfile = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'security') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const { bio, location, address, mobile, gmail } = req.body;
+    const SystemProfile = require('../models/SystemProfile');
+    let profile = await SystemProfile.findOne({ role: req.user.role });
+    if (!profile) {
+      return res.status(404).json({ message: 'Profile not found' });
+    }
+    profile.bio = bio !== undefined ? bio : profile.bio;
+    profile.location = location !== undefined ? location : profile.location;
+    profile.address = address !== undefined ? address : profile.address;
+    profile.mobile = mobile !== undefined ? mobile : profile.mobile;
+    profile.email = gmail !== undefined ? gmail : profile.email;
+    
+    await profile.save();
+    res.status(200).json(profile);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getResidents,
   addResident,
@@ -635,5 +790,8 @@ module.exports = {
   resetForgotPassword,
   loginResident,
   bulkCreateResidents,
-  getResidentById
+  getResidentById,
+  changeSystemPassword,
+  getSystemProfile,
+  updateSystemProfile
 };

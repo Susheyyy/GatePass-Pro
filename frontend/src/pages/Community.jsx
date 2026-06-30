@@ -63,6 +63,7 @@ export default function Community() {
   };
 
   useEffect(() => {
+    document.title = 'Community | GatePass Pro';
     fetchData();
   }, [userRole, residentId, residentEmail]);
 

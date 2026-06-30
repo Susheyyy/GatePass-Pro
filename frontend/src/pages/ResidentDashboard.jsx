@@ -19,6 +19,35 @@ import { FormButton, FormInput } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 import { getSocket } from '../services/socket';
 
+const ExpiryCountdown = ({ createdAt }) => {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const difference = (new Date(createdAt).getTime() + 24 * 60 * 60 * 1000) - Date.now();
+      if (difference <= 0) {
+        return 'Expired';
+      }
+      const hours = Math.floor(difference / (1000 * 60 * 60));
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      return `${hours}h ${minutes}m left`;
+    };
+
+    setTimeLeft(calculateTimeLeft());
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, [createdAt]);
+
+  return (
+    <div style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 'bold', marginTop: '4px' }}>
+      {timeLeft}
+    </div>
+  );
+};
+
 export default function ResidentDashboard() {
   const toast = useToast();
   const [resident, setResident] = useState(null);
@@ -76,6 +105,7 @@ export default function ResidentDashboard() {
   };
 
   useEffect(() => {
+    document.title = 'Dashboard | GatePass Pro';
     fetchResidentDetails();
   }, [residentId, residentEmail]);
 
@@ -566,6 +596,9 @@ export default function ResidentDashboard() {
                     <td style={{ padding: '14px 0', fontWeight: '600', color: 'var(--primary)' }}>{visitor.type}</td>
                     <td style={{ padding: '14px 0', textAlign: 'center', fontWeight: '700', color: 'var(--accent)' }}>
                       <code>{visitor.passcode}</code>
+                      {visitor.status === 'Approved' && (
+                        <ExpiryCountdown createdAt={visitor.createdAt} />
+                      )}
                     </td>
                     <td style={{ padding: '14px 0', textAlign: 'center' }}>
                       <span style={{

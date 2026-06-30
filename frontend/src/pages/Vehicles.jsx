@@ -26,6 +26,8 @@ export default function Vehicles() {
   const [myResidentProfile, setMyResidentProfile] = useState(null);
   const [newVehicleNumber, setNewVehicleNumber] = useState('');
   const [savingVehicle, setSavingVehicle] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [vehicleToDelete, setVehicleToDelete] = useState('');
 
   const fetchDirectory = async () => {
     try {
@@ -34,13 +36,17 @@ export default function Vehicles() {
       setResidents(list);
       
       if (userRole === 'resident') {
-        const matched = list.find(r => r._id === residentId || r.email.toLowerCase() === residentEmail?.toLowerCase());
+        let matched = null;
+        if (residentId) {
+          matched = await residentApi.getById(residentId);
+        } else {
+          matched = list.find(r => r._id === residentId || r.email.toLowerCase() === residentEmail?.toLowerCase());
+        }
         if (matched) {
           setMyResidentProfile(matched);
         }
       }
     } catch (err) {
-      console.error(err);
       toast.error('Failed to load vehicle directory.');
     } finally {
       setLoading(false);
@@ -48,6 +54,7 @@ export default function Vehicles() {
   };
 
   useEffect(() => {
+    document.title = 'Vehicles | GatePass Pro';
     fetchDirectory();
   }, [residentId, residentEmail, userRole]);
 
@@ -76,7 +83,6 @@ export default function Vehicles() {
     try {
       const updatedVehicles = [...existingVehicles, cleanVehicleNumber];
       const updated = await residentApi.update(myResidentProfile._id, {
-        ...myResidentProfile,
         vehicles: updatedVehicles
       });
       setMyResidentProfile(updated);
@@ -91,24 +97,24 @@ export default function Vehicles() {
     }
   };
 
-  const handleRemoveVehicle = async (vehicleNo) => {
-    if (!myResidentProfile) return;
-    
-    if (!window.confirm(`Are you sure you want to remove vehicle ${vehicleNo}?`)) {
-      return;
-    }
+  const triggerRemoveVehicle = (vehicleNo) => {
+    setVehicleToDelete(vehicleNo);
+    setIsDeleteOpen(true);
+  };
 
+  const confirmRemoveVehicle = async () => {
+    if (!myResidentProfile || !vehicleToDelete) return;
     setSavingVehicle(true);
     try {
       const existingVehicles = myResidentProfile.vehicles || [];
-      const updatedVehicles = existingVehicles.filter(v => v !== vehicleNo);
+      const updatedVehicles = existingVehicles.filter(v => v !== vehicleToDelete);
       const updated = await residentApi.update(myResidentProfile._id, {
-        ...myResidentProfile,
         vehicles: updatedVehicles
       });
       setMyResidentProfile(updated);
-      toast.success(`Vehicle ${vehicleNo} removed successfully.`);
-      // Refresh list
+      toast.success(`Vehicle ${vehicleToDelete} removed successfully.`);
+      setIsDeleteOpen(false);
+      setVehicleToDelete('');
       const list = await residentApi.getAll();
       setResidents(list);
     } catch (err) {
@@ -214,7 +220,7 @@ export default function Vehicles() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => handleRemoveVehicle(vehicle)}
+                    onClick={() => triggerRemoveVehicle(vehicle)}
                     disabled={savingVehicle}
                     style={{
                       background: 'none',
@@ -383,6 +389,47 @@ export default function Vehicles() {
           </div>
         )}
       </div>
+
+      {isDeleteOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '16px',
+            padding: '24px',
+            width: '90%',
+            maxWidth: '400px',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--border)'
+          }}>
+            <h4 style={{ margin: '0 0 10px', fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-main)' }}>
+              Confirm Removal
+            </h4>
+            <p style={{ margin: '0 0 20px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              Are you sure you want to remove vehicle <strong>{vehicleToDelete}</strong> from your profile?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <FormButton onClick={() => setIsDeleteOpen(false)} variant="secondary">
+                Cancel
+              </FormButton>
+              <FormButton onClick={confirmRemoveVehicle} variant="accent">
+                Remove
+              </FormButton>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

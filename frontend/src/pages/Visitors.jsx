@@ -17,6 +17,35 @@ import { getSocket } from '../services/socket';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
+const ExpiryCountdown = ({ createdAt }) => {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const difference = (new Date(createdAt).getTime() + 24 * 60 * 60 * 1000) - Date.now();
+      if (difference <= 0) {
+        return 'Expired';
+      }
+      const hours = Math.floor(difference / (1000 * 60 * 60));
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      return `${hours}h ${minutes}m left`;
+    };
+
+    setTimeLeft(calculateTimeLeft());
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, [createdAt]);
+
+  return (
+    <div style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 'bold', marginTop: '4px' }}>
+      {timeLeft}
+    </div>
+  );
+};
+
 export default function Visitors() {
   const toast = useToast();
   const [visitors, setVisitors] = useState([]);
@@ -53,6 +82,7 @@ export default function Visitors() {
   };
 
   useEffect(() => {
+    document.title = 'Visitors | GatePass Pro';
     fetchVisitors();
   }, []);
 
@@ -313,6 +343,9 @@ export default function Visitors() {
                     </td>
                     <td style={{ padding: '16px', textAlign: 'center', fontWeight: '700', fontSize: '1rem', color: 'var(--accent)' }}>
                       <code>{visitor.passcode}</code>
+                      {visitor.status === 'Approved' && (
+                        <ExpiryCountdown createdAt={visitor.createdAt} />
+                      )}
                     </td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>
                       <span style={{

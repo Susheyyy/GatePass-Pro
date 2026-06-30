@@ -64,27 +64,16 @@ export function FormButton({
       case 'success':
         return 'btn-global btn-success';
       case 'danger':
-        return 'btn-global'; 
+        return 'btn-global btn-danger';
+      case 'secondary':
+        return 'btn-global btn-secondary';
       default:
         return 'btn-global btn-primary';
     }
   };
 
   const getCustomStyles = () => {
-    let base = {};
-    if (variant === 'danger') {
-      base = {
-        background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
-        color: 'white'
-      };
-    } else if (variant === 'secondary') {
-      base = {
-        background: 'white',
-        border: '1px solid var(--border)',
-        color: 'var(--text-muted)'
-      };
-    }
-    return { ...base, ...style };
+    return style;
   };
 
   return (

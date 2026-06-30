@@ -43,7 +43,11 @@ const createPost = async (req, res) => {
         type: 'community'
       });
       if (req.io) {
-        req.io.emit('new_notification', newNotif);
+        req.io.to('room_admins').emit('new_notification', newNotif);
+        const uniqueFlats = await Resident.distinct('flatNo');
+        uniqueFlats.forEach(flat => {
+          req.io.to(`room_flat_${flat.toUpperCase().trim()}`).emit('new_notification', newNotif);
+        });
       }
     } catch (err) {
     }
@@ -88,8 +92,17 @@ const addComment = async (req, res) => {
         message: `${authorName} (${flatNo}): "${text.length > 50 ? text.substring(0, 50) + '...' : text}" on post "${post.title}"`,
         type: 'community'
       });
-    } catch (err) {
-    }
+      if (req.io) {
+        if (isSystemAdmin) {
+          req.io.to('room_admins').emit('new_notification', newNotif);
+          const uniqueFlats = await Resident.distinct('flatNo');
+          uniqueFlats.forEach(flat => {
+            req.io.to(`room_flat_${flat.toUpperCase().trim()}`).emit('new_notification', newNotif);
+          });
+        } else {
+          req.io.to('room_admins').emit('new_notification', newNotif);
+        }
+      }
 
     res.status(201).json(saved);
   } catch (error) {

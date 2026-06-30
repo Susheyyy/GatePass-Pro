@@ -44,7 +44,7 @@ export default function Residents() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState(null);
 
-  const [notification, setNotification] = useState('');
+
 
   const fetchResidents = async (query = '') => {
     setLoading(true);
@@ -60,6 +60,7 @@ export default function Residents() {
   };
 
   useEffect(() => {
+    document.title = 'Residents | GatePass Pro';
     fetchResidents();
   }, []);
 
@@ -71,11 +72,6 @@ export default function Residents() {
     const val = e.target.value;
     setSearchQuery(val);
     fetchResidents(val);
-  };
-
-  const showNotification = (msg) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(''), 4000);
   };
 
   const handleOpenAdd = () => {
@@ -142,10 +138,10 @@ export default function Residents() {
       };
       if (formMode === 'add') {
         await residentApi.create(submitData);
-        showNotification('New resident added successfully!');
+        toast.success('New resident added successfully!');
       } else {
         await residentApi.update(selectedResidentId, submitData);
-        showNotification('Resident details updated successfully!');
+        toast.success('Resident details updated successfully!');
       }
       setIsFormOpen(false);
       fetchResidents(searchQuery);
@@ -167,6 +163,11 @@ export default function Residents() {
   const handleCsvImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+      toast.error('File size exceeds the 1MB limit.');
+      return;
+    }
     
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -177,6 +178,10 @@ export default function Residents() {
           toast.warning('CSV file is empty or missing headers.');
           return;
         }
+        if (lines.length > 251) {
+          toast.warning('CSV file contains too many rows (maximum limit is 250 residents).');
+          return;
+        }
         
         const headers = lines[0].split(',').map(h => h.trim().replace(/['"]+/g, '').toLowerCase());
         const residents = [];
@@ -185,7 +190,13 @@ export default function Residents() {
           const line = lines[i].trim();
           if (!line) continue;
           
-          const values = line.split(',').map(v => v.trim().replace(/['"]+/g, ''));
+          const values = line.split(',').map(v => {
+            let clean = v.trim().replace(/['"]+/g, '');
+            if (/^[=+\-@]/.test(clean)) {
+              clean = `'` + clean;
+            }
+            return clean;
+          });
           const residentObj = {};
           headers.forEach((header, index) => {
             residentObj[header] = values[index];
@@ -220,7 +231,7 @@ export default function Residents() {
     if (!residentToDelete) return;
     try {
       await residentApi.delete(residentToDelete._id);
-      showNotification(`Resident ${residentToDelete.name} has been deleted.`);
+      toast.success(`Resident ${residentToDelete.name} has been deleted.`);
       setIsDeleteOpen(false);
       setResidentToDelete(null);
       fetchResidents(searchQuery);
@@ -232,7 +243,7 @@ export default function Residents() {
   const handleResendOtp = async (resident) => {
     try {
       await residentApi.resendOtp(resident._id);
-      showNotification(`New verification OTP sent to ${resident.name}'s Gmail address.`);
+      toast.success(`New verification OTP sent to ${resident.name}'s Gmail address.`);
     } catch (err) {
       setError(err.message || 'Failed to resend OTP.');
     }
@@ -272,24 +283,7 @@ export default function Residents() {
         </div>
       </div>
 
-      {notification && (
-        <div style={{
-          backgroundColor: 'var(--success-light)',
-          color: 'var(--success)',
-          padding: '16px 20px',
-          borderRadius: '12px',
-          fontSize: '0.95rem',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          border: '1px solid rgba(16, 185, 129, 0.15)',
-          animation: 'fadeIn 0.3s ease-out'
-        }}>
-          <Check size={18} style={{ strokeWidth: 3 }} />
-          <span>{notification}</span>
-        </div>
-      )}
+
 
       <div style={{ 
         display: 'grid', 

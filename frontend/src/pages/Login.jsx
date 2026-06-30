@@ -30,6 +30,7 @@ export default function Login() {
   const defaultResidentPassword = "resident123";
 
   useEffect(() => {
+    document.title = 'Login | GatePass Pro';
     const paramEmail = searchParams.get('email');
     if (paramEmail) setEmail(paramEmail);
   }, [searchParams]);
