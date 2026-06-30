@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Clock, X } from 'lucide-react';
-import { postApi, residentApi } from '../services/api';
+import { postApi, residentApi, getUserInfo } from '../services/api';
 import { FormButton, FormInput } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
@@ -21,9 +21,7 @@ const getCategoryStyle = (category) => {
 
 export default function Community() {
   const toast = useToast();
-  const userRole = localStorage.getItem('gatepass_role') || 'admin';
-  const residentId = localStorage.getItem('gatepass_resident_id');
-  const residentEmail = localStorage.getItem('gatepass_resident_email');
+  const { role: userRole, residentId, email: residentEmail } = getUserInfo();
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);

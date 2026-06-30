@@ -103,6 +103,7 @@ const addComment = async (req, res) => {
           req.io.to('room_admins').emit('new_notification', newNotif);
         }
       }
+    } catch (err) {}
 
     res.status(201).json(saved);
   } catch (error) {

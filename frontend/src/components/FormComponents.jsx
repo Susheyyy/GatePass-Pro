@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function FormInput({
   label,
   type = 'text',

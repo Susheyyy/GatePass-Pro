@@ -6,19 +6,15 @@ import {
   Trash2, 
   Phone, 
   Building, 
-  User, 
   AlertCircle,
-  CheckCircle
 } from 'lucide-react';
-import { residentApi } from '../services/api';
+import { residentApi, getUserInfo } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
 export default function Vehicles() {
   const toast = useToast();
-  const userRole = localStorage.getItem('gatepass_role') || 'admin';
-  const residentId = localStorage.getItem('gatepass_resident_id');
-  const residentEmail = localStorage.getItem('gatepass_resident_email');
+  const { role: userRole, residentId, email: residentEmail } = getUserInfo();
 
   const [loading, setLoading] = useState(true);
   const [residents, setResidents] = useState([]);
@@ -124,7 +120,7 @@ export default function Vehicles() {
     }
   };
 
-  // Filter residents based on search query matching name, flat number, or vehicle number
+  
   const filteredVehicles = residents.reduce((acc, res) => {
     const vehiclesList = res.vehicles || [];
     vehiclesList.forEach(veh => {
@@ -150,7 +146,6 @@ export default function Vehicles() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
       <div>
         <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Car size={32} style={{ color: 'var(--primary)' }} />
           <span>Vehicle Directory</span>
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>

@@ -55,9 +55,6 @@ export default function Login() {
 
         if (loginRes.role === 'admin') {
           localStorage.setItem('gatepass_token', token);
-          localStorage.setItem('gatepass_role', 'admin');
-          localStorage.removeItem('gatepass_resident_id');
-          localStorage.removeItem('gatepass_resident_email');
           setIsLoading(false);
           navigate('/');
           return;
@@ -65,9 +62,6 @@ export default function Login() {
 
         if (loginRes.role === 'security') {
           localStorage.setItem('gatepass_token', token);
-          localStorage.setItem('gatepass_role', 'security');
-          localStorage.removeItem('gatepass_resident_id');
-          localStorage.removeItem('gatepass_resident_email');
           setIsLoading(false);
           navigate('/visitors');
           return;
@@ -83,10 +77,6 @@ export default function Login() {
         }
 
         localStorage.setItem('gatepass_token', token);
-        localStorage.setItem('gatepass_role', 'resident');
-        localStorage.setItem('gatepass_resident_id', matchedResident._id);
-        localStorage.setItem('gatepass_resident_email', matchedResident.email);
-        localStorage.setItem('gatepass_flat_no', matchedResident.flatNo);
         setIsLoading(false);
         navigate('/resident-dashboard');
         return;
@@ -126,10 +116,6 @@ export default function Login() {
 
       const loginRes = await residentApi.login(updatedResident.email, newPassword);
       localStorage.setItem('gatepass_token', loginRes.token);
-      localStorage.setItem('gatepass_role', 'resident');
-      localStorage.setItem('gatepass_resident_id', updatedResident._id);
-      localStorage.setItem('gatepass_resident_email', updatedResident.email);
-      localStorage.setItem('gatepass_flat_no', updatedResident.flatNo);
       setIsLoading(false);
       navigate('/resident-dashboard');
     } catch (err) {
@@ -174,10 +160,6 @@ export default function Login() {
       const resident = await residentApi.resetForgotPassword(forgotEmail, enteredOtp, newPassword);
       const loginRes = await residentApi.login(resident.email, newPassword);
       localStorage.setItem('gatepass_token', loginRes.token);
-      localStorage.setItem('gatepass_role', 'resident');
-      localStorage.setItem('gatepass_resident_id', resident._id);
-      localStorage.setItem('gatepass_resident_email', resident.email);
-      localStorage.setItem('gatepass_flat_no', resident.flatNo);
       setIsLoading(false);
       navigate('/resident-dashboard');
     } catch (err) {
@@ -779,7 +761,6 @@ export default function Login() {
             </div>
           </form>
         )}
-
 
       </div>
 

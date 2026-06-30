@@ -50,13 +50,13 @@ const authorizeVisitorAccess = async (req, res, next) => {
       return next();
     }
 
-    // Residents should only be allowed to fetch visitors for their own flatNo.
+    
     if (req.method === 'GET') {
       req.query.flatNo = req.user.flatNo;
       return next();
     }
 
-    // Residents should only be allowed to create visitors for their own flatNo.
+    
     if (req.method === 'POST') {
       if (req.body.flatNo !== req.user.flatNo) {
         return res.status(403).json({ message: 'Forbidden: You can only create visitor logs for your own flat.' });
@@ -64,7 +64,7 @@ const authorizeVisitorAccess = async (req, res, next) => {
       return next();
     }
 
-    // Resident must own the visitor log (the visitor's flatNo must match resident's flatNo).
+    
     if (req.params.id) {
       const visitor = await Visitor.findById(req.params.id);
       if (!visitor) {

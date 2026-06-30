@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { residentApi, getUserFromToken } from '../services/api';
+import { residentApi, getUserInfo } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
@@ -26,10 +26,7 @@ export default function Profile() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const user = getUserFromToken();
-  const userRole = user ? user.role : 'admin';
-  const residentId = localStorage.getItem('gatepass_resident_id');
-  const residentEmail = localStorage.getItem('gatepass_resident_email');
+  const { role: userRole, residentId, email: residentEmail } = getUserInfo();
   const [selectedAvatar, setSelectedAvatar] = useState('avatar1');
 
   const fetchProfile = async () => {
@@ -173,7 +170,16 @@ export default function Profile() {
     );
   }
 
-  const initials = profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  if (!profile) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'var(--text-muted)' }}>
+        <span>No profile data found. Please log in again.</span>
+      </div>
+    );
+  }
+
+  const initials = (profile.name || profile.displayName || userRole)
+    .split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>

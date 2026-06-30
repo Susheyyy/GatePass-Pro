@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/
 
 axios.interceptors.request.use((config) => {
   const token = localStorage.getItem('gatepass_token');
-  if (token && token !== 'true') {
+  if (token && token.split('.').length === 3) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;
@@ -21,6 +21,16 @@ export const getUserFromToken = () => {
   } catch (e) {
     return null;
   }
+};
+
+export const getUserInfo = () => {
+  const user = getUserFromToken();
+  return {
+    role: user?.role || 'admin',
+    email: user?.email || '',
+    residentId: user?.residentId || '',
+    flatNo: user?.flatNo || ''
+  };
 };
 
 const DEFAULT_RESIDENTS = [];
@@ -61,7 +71,28 @@ export const residentApi = {
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      console.warn('Backend offline, logging in locally:', error.message);
+      if (email.trim().toLowerCase() === 'admin@gatepass.com') {
+        const storedAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
+        if (password === storedAdminPass) {
+          const payload = btoa(JSON.stringify({ role: 'admin', email: 'admin@gatepass.com' }));
+          return {
+            role: 'admin',
+            email: 'admin@gatepass.com',
+            token: `mock-admin-token.${payload}`
+          };
+        }
+      }
+      if (email.trim().toLowerCase() === 'security@gatepass.com') {
+        const storedSecurityPass = localStorage.getItem('gatepass_security_password') || 'security123';
+        if (password === storedSecurityPass) {
+          const payload = btoa(JSON.stringify({ role: 'security', email: 'security@gatepass.com' }));
+          return {
+            role: 'security',
+            email: 'security@gatepass.com',
+            token: `mock-security-token.${payload}`
+          };
+        }
+      }
       const list = getLocalResidents();
       const matched = list.find(r => {
         const firstName = r.name.trim().split(' ')[0].toLowerCase();
@@ -72,7 +103,12 @@ export const residentApi = {
       if (matched && matched.password === password) {
         const responseObj = { ...matched };
         delete responseObj.password;
-        return { resident: responseObj };
+        const payload = btoa(JSON.stringify({ role: 'resident', email: responseObj.email, residentId: responseObj._id, flatNo: responseObj.flatNo }));
+        return {
+          role: 'resident',
+          resident: responseObj,
+          token: `mock-resident-token.${payload}`
+        };
       }
       throw new Error('Access Denied. Check email or password.');
     }
@@ -401,7 +437,7 @@ export const residentApi = {
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      const role = localStorage.getItem('gatepass_role');
+      const { role } = getUserInfo();
       if (role === 'admin') {
         const currentAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
         if (currentPassword !== currentAdminPass) {
@@ -769,8 +805,7 @@ export const postApi = {
       const list = getLocalPosts();
       let authorName = 'System Admin';
       let flatNo = 'Admin';
-      const role = localStorage.getItem('gatepass_role');
-      const resId = localStorage.getItem('gatepass_resident_id');
+      const { role, residentId: resId } = getUserInfo();
       if (role === 'resident' && resId) {
         const residentsList = getLocalResidents();
         const resident = residentsList.find(r => r._id === resId);
@@ -813,8 +848,7 @@ export const postApi = {
         }
         let authorName = 'System Admin';
         let flatNo = 'Admin';
-        const role = localStorage.getItem('gatepass_role');
-        const resId = localStorage.getItem('gatepass_resident_id');
+        const { role, residentId: resId } = getUserInfo();
         if (role === 'resident' && resId) {
           const residentsList = getLocalResidents();
           const resident = residentsList.find(r => r._id === resId);

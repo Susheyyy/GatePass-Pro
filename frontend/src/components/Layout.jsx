@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, LogOut, Shield, Bell, CheckCircle2, User, MessageSquare, Trash2, Car } from 'lucide-react';
-import { notificationApi, residentApi, visitorApi, getUserFromToken } from '../services/api';
-import { connectSocket, getSocket, disconnectSocket } from '../services/socket';
+import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car } from 'lucide-react';
+import { notificationApi, residentApi, visitorApi, getUserInfo } from '../services/api';
+import { connectSocket, disconnectSocket } from '../services/socket';
 
 const AVATAR_MAP = {
   avatar1: { emoji: '👤', bg: 'linear-gradient(135deg, #6366f1, #a855f7)' },
@@ -49,21 +49,7 @@ const playAlarmSound = () => {
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [flatNo] = useState(() => {
-    const direct = localStorage.getItem('gatepass_flat_no');
-    if (direct) return direct;
-    const token = localStorage.getItem('gatepass_token');
-    if (token) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          return payload.flatNo || '';
-        }
-      } catch (err) {}
-    }
-    return '';
-  });
+  const { flatNo, role: userRole, email: residentEmail } = getUserInfo();
   const [notifications, setNotifications] = useState([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [distressBanners, setDistressBanners] = useState([]);
@@ -79,14 +65,8 @@ export default function Layout({ children }) {
 
   const handleLogout = () => {
     localStorage.removeItem('gatepass_token');
-    localStorage.removeItem('gatepass_role');
-    localStorage.removeItem('gatepass_resident_id');
-    localStorage.removeItem('gatepass_resident_email');
-    localStorage.removeItem('gatepass_flat_no');
     navigate('/login');
   };
-
-  const userRole = localStorage.getItem('gatepass_role') || 'admin';
 
   const fetchNotifications = async () => {
     try {
@@ -102,7 +82,7 @@ export default function Layout({ children }) {
 
     if (userRole === 'resident') {
       residentApi.getAll().then(list => {
-        const email = localStorage.getItem('gatepass_resident_email');
+        const email = residentEmail;
         const current = list.find(r => r.gmail === email);
         if (current && current.avatar) {
           setAvatar(current.avatar);
@@ -417,7 +397,6 @@ export default function Layout({ children }) {
               </div>
             )}
           </div>
-          
           <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border)' }}></div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -449,7 +428,7 @@ export default function Layout({ children }) {
 
       <div className="layout-body">
         <aside className="sidebar">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+          <div className="sidebar-nav-links">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -465,7 +444,7 @@ export default function Layout({ children }) {
             })}
           </div>
           
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="sidebar-logout-container">
 
 
 

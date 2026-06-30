@@ -45,8 +45,6 @@ export default function Residents() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState(null);
 
-
-
   const fetchResidents = async (query = '') => {
     setLoading(true);
     try {
@@ -283,8 +281,6 @@ export default function Residents() {
           </FormButton>
         </div>
       </div>
-
-
 
       <div style={{ 
         display: 'grid', 

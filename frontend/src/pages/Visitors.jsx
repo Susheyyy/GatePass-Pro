@@ -1,13 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
-  ShieldAlert, 
+Ban, 
   Search, 
-  Trash2, 
-  Home, 
-  User, 
-  Phone, 
-  MapPin, 
-  Check, 
+  Trash2,
   LogOut, 
   LogIn,
   X 
@@ -455,10 +450,10 @@ export default function Visitors() {
                               setTargetBlockMobile(visitor.mobile);
                               setIsBlockModalOpen(true);
                             }}
-                            title="Block Actor"
+                            title="Block Visitor"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', padding: '6px' }}
                           >
-                            <ShieldAlert size={16} />
+                            <Ban size={16} />
                           </button>
                         )}
                       </div>

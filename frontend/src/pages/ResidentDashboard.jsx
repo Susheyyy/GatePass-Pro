@@ -2,19 +2,15 @@ import { useState, useEffect } from 'react';
 import {  
   XCircle, 
   Clock, 
-  Building, 
-  User, 
-  Phone, 
-  Mail, 
+  Building,  
   Users,
   AlertTriangle,
   MessageSquare,
   Send,
   X,
-  Plus,
   Key
 } from 'lucide-react';
-import { residentApi, visitorApi } from '../services/api';
+import { residentApi, visitorApi, getUserInfo } from '../services/api';
 import { FormButton, FormInput } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 import { getSocket } from '../services/socket';
@@ -72,8 +68,7 @@ export default function ResidentDashboard() {
     mobile: ''
   });
 
-  const residentId = localStorage.getItem('gatepass_resident_id');
-  const residentEmail = localStorage.getItem('gatepass_resident_email');
+  const { residentId, email: residentEmail } = getUserInfo();
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [distressMessage, setDistressMessage] = useState('');
