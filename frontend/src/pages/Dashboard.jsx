@@ -95,6 +95,7 @@ export default function Dashboard() {
   const [sendingAlert, setSendingAlert] = useState(false);
 
   useEffect(() => {
+    document.title = 'Dashboard | GatePass Pro';
     const loadData = async () => {
       try {
         const residents = await residentApi.getAll();
