@@ -619,6 +619,7 @@ export default function Login() {
                     backgroundColor: 'white'
                   }}
                 />
+                <KeyRound size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-light)' }} />
               </div>
             </div>
 
