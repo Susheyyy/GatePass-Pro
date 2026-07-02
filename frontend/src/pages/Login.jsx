@@ -600,8 +600,7 @@ export default function Login() {
               <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Enter OTP Code
               </label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input
+              <input
                   type="text"
                   value={enteredOtp}
                   onChange={(e) => { setEnteredOtp(e.target.value); setValidationError(''); }}
@@ -610,7 +609,7 @@ export default function Login() {
                   disabled={isLoading}
                   style={{
                     width: '100%',
-                    padding: '12px 16px 12px 42px',
+                    padding: '12px 16px',
                     borderRadius: '10px',
                     border: '1px solid var(--border)',
                     fontSize: '0.9rem',
@@ -619,8 +618,6 @@ export default function Login() {
                     backgroundColor: 'white'
                   }}
                 />
-                <KeyRound size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-light)' }} />
-              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
