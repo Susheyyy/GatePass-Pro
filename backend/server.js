@@ -15,10 +15,13 @@ const socketio = require('socket.io');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const rawOrigin = process.env.FRONTEND_URL || '*';
+const allowedOrigin = rawOrigin.endsWith('/') ? rawOrigin.slice(0, -1) : rawOrigin;
+
 const server = http.createServer(app);
 const io = socketio(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || '*',
+    origin: allowedOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE']
   }
 });
@@ -29,7 +32,7 @@ app.use(helmet({
   contentSecurityPolicy: false
 }));
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*'
+  origin: allowedOrigin
 }));
 app.use(express.json());
 
