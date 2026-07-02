@@ -48,11 +48,6 @@ const addVisitor = async (req, res) => {
       return res.status(400).json({ message: 'Name, type, and flat number are required' });
     }
 
-    const SystemSetting = require('../models/SystemSetting');
-    const isLockdown = await SystemSetting.findOne({ key: 'lockdown' });
-    if (isLockdown && isLockdown.value === true) {
-      return res.status(403).json({ message: 'Emergency Lockdown Active: All entry permits suspended.' });
-    }
 
     const Blocklist = require('../models/Blocklist');
     const isBlocked = await Blocklist.findOne({ mobile });
@@ -282,39 +277,6 @@ const exportVisitorsCSV = async (req, res) => {
   }
 };
 
-const toggleLockdown = async (req, res) => {
-  try {
-    const { lockdown } = req.body;
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-    const SystemSetting = require('../models/SystemSetting');
-    let setting = await SystemSetting.findOne({ key: 'lockdown' });
-    if (!setting) {
-      setting = await SystemSetting.create({ key: 'lockdown', value: false });
-    }
-    setting.value = lockdown;
-    await setting.save();
-
-    if (req.io) {
-      req.io.emit('lockdown_status_changed', { lockdown });
-    }
-
-    res.status(200).json({ lockdown: setting.value });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const getLockdownStatus = async (req, res) => {
-  try {
-    const SystemSetting = require('../models/SystemSetting');
-    const setting = await SystemSetting.findOne({ key: 'lockdown' });
-    res.status(200).json({ lockdown: setting ? setting.value : false });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
 const addBlocklist = async (req, res) => {
   try {
@@ -368,8 +330,6 @@ module.exports = {
   deleteVisitor,
   verifyPasscode,
   exportVisitorsCSV,
-  toggleLockdown,
-  getLockdownStatus,
   addBlocklist,
   getBlocklist,
   removeBlocklist

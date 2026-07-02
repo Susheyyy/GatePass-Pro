@@ -53,15 +53,8 @@ export default function Layout({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [distressBanners, setDistressBanners] = useState([]);
-  const [lockdown, setLockdown] = useState(false);
   const [avatar, setAvatar] = useState('avatar1');
 
-  const fetchLockdownStatus = async () => {
-    try {
-      const data = await visitorApi.getLockdownStatus();
-      setLockdown(data.lockdown);
-    } catch (err) {}
-  };
 
   const handleLogout = () => {
     localStorage.removeItem('gatepass_token');
@@ -78,8 +71,6 @@ export default function Layout({ children }) {
   };
 
   useEffect(() => {
-    fetchLockdownStatus();
-
     if (userRole === 'resident') {
       residentApi.getAll().then(list => {
         const email = residentEmail;
@@ -102,9 +93,6 @@ export default function Layout({ children }) {
           setNotifications(prev => [newNotif, ...prev]);
         });
 
-        socket.on('lockdown_status_changed', (payload) => {
-          setLockdown(payload.lockdown);
-        });
 
         if (userRole === 'admin') {
           socket.on('distress_alert', (data) => {
@@ -127,7 +115,6 @@ export default function Layout({ children }) {
       return () => {
         if (socket) {
           socket.off('new_notification');
-          socket.off('lockdown_status_changed');
           if (userRole === 'admin') {
             socket.off('distress_alert');
             socket.off('distress_resolved');
@@ -470,25 +457,6 @@ export default function Layout({ children }) {
 
         <main className="content-frame">
           <div className="app-container">
-            {lockdown && (
-              <div style={{
-                backgroundColor: 'var(--accent)',
-                color: 'white',
-                padding: '12px 20px',
-                borderRadius: '12px',
-                marginBottom: '24px',
-                fontWeight: '800',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                boxShadow: '0 4px 12px rgba(244, 63, 94, 0.4)',
-                animation: 'pulse 2s infinite'
-              }}>
-                <ShieldAlert size={18} />
-                <span>⚠️ EMERGENCY LOCKDOWN ACTIVE: ALL ENTRY PERMITS SUSPENDED</span>
-              </div>
-            )}
             {children}
           </div>
         </main>

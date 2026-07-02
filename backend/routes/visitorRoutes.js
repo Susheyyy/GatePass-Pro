@@ -8,8 +8,6 @@ const {
   deleteVisitor,
   verifyPasscode,
   exportVisitorsCSV,
-  toggleLockdown,
-  getLockdownStatus,
   addBlocklist,
   getBlocklist,
   removeBlocklist
@@ -23,9 +21,6 @@ router.route('/')
 
 router.get('/export', protectRoute, restrictToRoles('admin'), exportVisitorsCSV);
 
-router.route('/system/lockdown')
-  .get(protectRoute, getLockdownStatus)
-  .post(protectRoute, restrictToRoles('admin'), toggleLockdown);
 
 router.route('/blocklist')
   .get(protectRoute, restrictToRoles('admin'), getBlocklist)
