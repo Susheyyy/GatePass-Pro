@@ -54,14 +54,14 @@ export default function Login() {
         const token = loginRes.token;
 
         if (loginRes.role === 'admin') {
-          localStorage.setItem('gatepass_token', token);
+          sessionStorage.setItem('gatepass_token', token);
           setIsLoading(false);
           navigate('/');
           return;
         }
 
         if (loginRes.role === 'security') {
-          localStorage.setItem('gatepass_token', token);
+          sessionStorage.setItem('gatepass_token', token);
           setIsLoading(false);
           navigate('/visitors');
           return;
@@ -76,7 +76,7 @@ export default function Login() {
           return;
         }
 
-        localStorage.setItem('gatepass_token', token);
+        sessionStorage.setItem('gatepass_token', token);
         setIsLoading(false);
         navigate('/resident-dashboard');
         return;
@@ -114,8 +114,8 @@ export default function Login() {
         otp: enteredOtp.trim()
       });
 
-      const loginRes = await residentApi.login(updatedResident.email, newPassword);
-      localStorage.setItem('gatepass_token', loginRes.token);
+       const loginRes = await residentApi.login(updatedResident.email, newPassword);
+      sessionStorage.setItem('gatepass_token', loginRes.token);
       setIsLoading(false);
       navigate('/resident-dashboard');
     } catch (err) {
@@ -159,7 +159,7 @@ export default function Login() {
     try {
       const resident = await residentApi.resetForgotPassword(forgotEmail, enteredOtp, newPassword);
       const loginRes = await residentApi.login(resident.email, newPassword);
-      localStorage.setItem('gatepass_token', loginRes.token);
+      sessionStorage.setItem('gatepass_token', loginRes.token);
       setIsLoading(false);
       navigate('/resident-dashboard');
     } catch (err) {

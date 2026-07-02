@@ -153,6 +153,7 @@ const addResident = async (req, res) => {
     try {
       await transporter.sendMail(mailOptions);
     } catch (mailError) {
+      console.error('Mail Send Error (Registration Request):', mailError);
     }
     
     const responseObj = resident.toObject();
@@ -242,6 +243,7 @@ const updateResident = async (req, res) => {
         try {
           await transporter.sendMail(mailOptions);
         } catch (mailError) {
+          console.error('Mail Send Error (Approved Welcome):', mailError);
         }
       }
       resident.bio = bio !== undefined ? bio : resident.bio;
@@ -368,6 +370,7 @@ const resendOtp = async (req, res) => {
     try {
       await transporter.sendMail(mailOptions);
     } catch (mailError) {
+      console.error('Mail Send Error (Resend OTP):', mailError);
     }
 
     res.status(200).json({ message: 'New OTP sent successfully' });
@@ -410,6 +413,7 @@ const forgotPassword = async (req, res) => {
     try {
       await transporter.sendMail(mailOptions);
     } catch (mailError) {
+      console.error('Mail Send Error (Forgot Password OTP):', mailError);
     }
 
     res.status(200).json({ message: 'Verification OTP sent to your registered Gmail address' });
@@ -651,6 +655,7 @@ const bulkCreateResidents = async (req, res) => {
       try {
         await transporter.sendMail(mailOptions);
       } catch (mailError) {
+        console.error('Mail Send Error (Bulk Import Account):', mailError);
       }
 
       created.push(newResident);

@@ -8,7 +8,7 @@ const SOCKET_URL = import.meta.env.VITE_API_URL
   : 'http://localhost:5000';
 
 export const connectSocket = (role, flatNo) => {
-  const token = localStorage.getItem('gatepass_token');
+  const token = sessionStorage.getItem('gatepass_token');
   const roomKey = `${role}_${flatNo || ''}`;
 
   if (socket && currentRoomInfo === roomKey && socket.connected) {

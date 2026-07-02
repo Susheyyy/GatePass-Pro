@@ -7,6 +7,7 @@ const visitorRoutes = require('./routes/visitorRoutes');
 const postRoutes = require('./routes/postRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const helmet = require('helmet');
+const path = require('path');
 
 const http = require('http');
 const socketio = require('socket.io');
@@ -24,7 +25,9 @@ const io = socketio(server, {
 
 connectDB();
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false
+}));
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*'
 }));
@@ -73,6 +76,15 @@ app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: "GatePass Pro Backend API Online" });
+});
+
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
 app.disable('x-powered-by');

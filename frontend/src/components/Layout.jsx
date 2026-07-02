@@ -57,7 +57,7 @@ export default function Layout({ children }) {
 
 
   const handleLogout = () => {
-    localStorage.removeItem('gatepass_token');
+    sessionStorage.removeItem('gatepass_token');
     navigate('/login');
   };
 

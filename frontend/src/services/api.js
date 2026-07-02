@@ -3,7 +3,7 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/residents';
 
 axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem('gatepass_token');
+  const token = sessionStorage.getItem('gatepass_token');
   if (token && token.split('.').length === 3) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
@@ -13,7 +13,7 @@ axios.interceptors.request.use((config) => {
 });
 
 export const getUserFromToken = () => {
-  const token = localStorage.getItem('gatepass_token');
+  const token = sessionStorage.getItem('gatepass_token');
   if (!token || token === 'true') return null;
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
