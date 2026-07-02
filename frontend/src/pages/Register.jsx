@@ -85,14 +85,14 @@ export default function Register() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '40px 20px',
+      padding: '20px 20px',
       background: 'radial-gradient(circle at 10% 20%, rgba(50, 11, 53, 0.05) 0%, rgba(255, 255, 255, 1) 90%)',
       overflow: 'hidden'
     }}>
       <div className="glow-circle glow-primary"></div>
       <div className="glow-circle glow-secondary"></div>
 
-      <div className="glass-container" style={{ maxWidth: '480px' }}>
+      <div className="glass-container" style={{ maxWidth: '480px', padding: '30px 24px' }}>
         
         <button
           onClick={() => navigate('/login')}
@@ -106,7 +106,7 @@ export default function Register() {
             gap: '8px',
             fontSize: '0.85rem',
             fontWeight: '600',
-            marginBottom: '24px',
+            marginBottom: '16px',
             padding: '4px 0',
             transition: 'var(--transition)'
           }}
@@ -119,16 +119,16 @@ export default function Register() {
 
         {!isSuccess ? (
           <>
-            <div style={{ marginBottom: '30px' }}>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em', marginBottom: '8px' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em', marginBottom: '4px' }}>
                 Join Your Community
               </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 Request a resident account. Admin approval is required to activate.
               </p>
             </div>
 
-            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
