@@ -78,14 +78,7 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: "GatePass Pro Backend API Online" });
 });
 
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
-
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
-});
+// Standalone API mode - Frontend is served via Vercel
 
 app.disable('x-powered-by');
 
