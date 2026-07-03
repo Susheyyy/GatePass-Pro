@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car, ChevronLeft, ChevronRight } from 'lucide-react';
 import { notificationApi, residentApi, visitorApi, getUserInfo } from '../services/api';
 import { connectSocket, disconnectSocket } from '../services/socket';
 
@@ -54,6 +54,9 @@ export default function Layout({ children }) {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [distressBanners, setDistressBanners] = useState([]);
   const [avatar, setAvatar] = useState('avatar1');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    localStorage.getItem('sidebar_collapsed') === 'true'
+  );
 
 
   const handleLogout = () => {
@@ -222,9 +225,11 @@ export default function Layout({ children }) {
       )}
       <header className="main-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.025em', color: 'var(--text-main)' }}>
-            GatePass <span style={{ color: 'var(--primary)' }}>Pro</span>
-          </h1>
+          <Link to="/" style={{ textDecoration: 'none' }}>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.025em', color: 'var(--text-main)', cursor: 'pointer' }}>
+              GatePass <span style={{ color: 'var(--primary)' }}>Pro</span>
+            </h1>
+          </Link>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -414,7 +419,20 @@ export default function Layout({ children }) {
       </header>
 
       <div className="layout-body">
-        <aside className="sidebar">
+        <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+          <button 
+            onClick={() => {
+              const newState = !isSidebarCollapsed;
+              setIsSidebarCollapsed(newState);
+              localStorage.setItem('sidebar_collapsed', newState);
+            }} 
+            className="sidebar-toggle-btn"
+            aria-label="Toggle Sidebar"
+          >
+            {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {!isSidebarCollapsed && <span>Collapse</span>}
+          </button>
+          
           <div className="sidebar-nav-links">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;

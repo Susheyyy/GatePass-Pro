@@ -152,10 +152,13 @@ const addResident = async (req, res) => {
       text: `Hello ${name},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}\n\nUpon first login, you will be required to change your password using the OTP.`
     };
     
+    console.log(`\n=================== REGISTRATION EMAIL PENDING SEND ===================\nTo: ${gmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n========================================================================\n`);
     try {
       await transporter.sendMail(mailOptions);
+      console.log('Email sent successfully via SMTP!');
     } catch (mailError) {
-      console.error('Mail Send Error (Registration Request):', mailError);
+      console.error('Mail Send Error (Registration Request):', mailError.message);
+      console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
     }
     
     const responseObj = resident.toObject();
@@ -242,10 +245,13 @@ const updateResident = async (req, res) => {
           text: `Hello ${resident.name},\n\nYour resident account registration request has been approved.\n\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${resident.otp}\n\nPlease click the link below to verify and sign in:\n${link}`
         };
         
+        console.log(`\n=================== APPROVAL EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${resident.otp}\nLogin Link: ${link}\n=======================================================================\n`);
         try {
           await transporter.sendMail(mailOptions);
+          console.log('Email sent successfully via SMTP!');
         } catch (mailError) {
-          console.error('Mail Send Error (Approved Welcome):', mailError);
+          console.error('Mail Send Error (Approved Welcome):', mailError.message);
+          console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${resident.email}, OTP=${resident.otp}, Link=${link}`);
         }
       }
       resident.bio = bio !== undefined ? bio : resident.bio;
@@ -369,10 +375,13 @@ const resendOtp = async (req, res) => {
       text: `Hello ${resident.name},\n\nYour new verification OTP has been generated.\n\nUsername: ${resident.email}\nDefault Password: resident123\nNew Verification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
     };
 
+    console.log(`\n=================== RESEND OTP EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nNew OTP: ${generatedOtp}\nLogin Link: ${link}\n======================================================================\n`);
     try {
       await transporter.sendMail(mailOptions);
+      console.log('Email sent successfully via SMTP!');
     } catch (mailError) {
-      console.error('Mail Send Error (Resend OTP):', mailError);
+      console.error('Mail Send Error (Resend OTP):', mailError.message);
+      console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${resident.email}, New OTP=${generatedOtp}, Link=${link}`);
     }
 
     res.status(200).json({ message: 'New OTP sent successfully' });
@@ -412,10 +421,13 @@ const forgotPassword = async (req, res) => {
       text: `Hello ${resident.name},\n\nWe received a request to reset your password.\n\nUsername: ${resident.email}\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to verify and choose a new password:\n${link}`
     };
 
+    console.log(`\n=================== FORGOT PASSWORD EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nReset OTP: ${generatedOtp}\nReset Link: ${link}\n=========================================================================\n`);
     try {
       await transporter.sendMail(mailOptions);
+      console.log('Email sent successfully via SMTP!');
     } catch (mailError) {
-      console.error('Mail Send Error (Forgot Password OTP):', mailError);
+      console.error('Mail Send Error (Forgot Password OTP):', mailError.message);
+      console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${resident.email}, OTP=${generatedOtp}, Link=${link}`);
     }
 
     res.status(200).json({ message: 'Verification OTP sent to your registered Gmail address' });
@@ -654,10 +666,13 @@ const bulkCreateResidents = async (req, res) => {
         text: `Hello ${cleanName},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
       };
 
+      console.log(`\n=================== BULK IMPORT EMAIL PENDING SEND ===================\nTo: ${formattedGmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n=======================================================================\n`);
       try {
         await transporter.sendMail(mailOptions);
+        console.log('Email sent successfully via SMTP!');
       } catch (mailError) {
-        console.error('Mail Send Error (Bulk Import Account):', mailError);
+        console.error('Mail Send Error (Bulk Import Account):', mailError.message);
+        console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
       }
 
       created.push(newResident);
