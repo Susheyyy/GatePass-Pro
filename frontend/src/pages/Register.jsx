@@ -194,7 +194,7 @@ export default function Register() {
                     name="mobile"
                     value={formData.mobile}
                     onChange={handleInputChange}
-                    placeholder="10-digit number"
+                    placeholder="Enter 10-digit number"
                     required
                     disabled={isLoading}
                     style={{
@@ -221,7 +221,7 @@ export default function Register() {
                     name="gmail"
                     value={formData.gmail}
                     onChange={handleInputChange}
-                    placeholder="username@gmail.com"
+                    placeholder="Enter email address"
                     required
                     disabled={isLoading}
                     style={{
