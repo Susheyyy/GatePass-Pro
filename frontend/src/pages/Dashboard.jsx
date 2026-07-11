@@ -18,6 +18,9 @@ export default function Dashboard() {
     pendingApprovals: 0,
     totalResidents: 0,
     pendingAlerts: 0,
+    deliveriesToday: 0,
+    avgStayDuration: '...',
+    peakTrafficHour: '...',
     recentVisitors: []
   });
   const [hourlyData, setHourlyData] = useState([0, 0, 0, 0, 0, 0]);
@@ -53,6 +56,30 @@ export default function Dashboard() {
       });
       setHourlyData(buckets);
 
+      const deliveriesToday = todayVisitors.filter(v => v.type === 'Delivery').length;
+
+      const exitsToday = todayVisitors.filter(v => v.status === 'Checked Out' && v.checkedInAt && v.checkedOutAt);
+      let avgStayDuration = 'No exits yet';
+      if (exitsToday.length > 0) {
+        const totalMs = exitsToday.reduce((sum, v) => sum + (new Date(v.checkedOutAt).getTime() - new Date(v.checkedInAt).getTime()), 0);
+        const avgMins = Math.round(totalMs / exitsToday.length / 1000 / 60);
+        avgStayDuration = avgMins >= 60 ? `${Math.floor(avgMins / 60)}h ${avgMins % 60}m` : `${avgMins} mins`;
+      }
+
+      const bucketLabels = ['00:00–04:00', '04:00–08:00', '08:00–12:00', '12:00–16:00', '16:00–20:00', '20:00–00:00'];
+      let peakTrafficHour = 'No entries';
+      let maxBuck = -1;
+      let maxIdx = -1;
+      buckets.forEach((val, idx) => {
+        if (val > maxBuck && val > 0) {
+          maxBuck = val;
+          maxIdx = idx;
+        }
+      });
+      if (maxIdx !== -1) {
+        peakTrafficHour = bucketLabels[maxIdx];
+      }
+
       const recent = visitorsList.slice(0, 4);
 
       setData({
@@ -62,6 +89,9 @@ export default function Dashboard() {
         pendingApprovals,
         totalResidents: residents.length,
         pendingAlerts,
+        deliveriesToday,
+        avgStayDuration,
+        peakTrafficHour,
         recentVisitors: recent
       });
     } catch (err) {
@@ -183,6 +213,30 @@ export default function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="content-card" style={{ padding: '24px' }}>
+        <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '20px' }}>
+          Today's Gate Analytics & Traffic Summary
+        </h3>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '24px'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Deliveries Logged Today</span>
+            <span style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>{loading ? '...' : data.deliveriesToday}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Average Guest Visit Duration</span>
+            <span style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>{loading ? '...' : data.avgStayDuration}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Peak Entry Window (Today)</span>
+            <span style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>{loading ? '...' : data.peakTrafficHour}</span>
+          </div>
+        </div>
       </div>
 
       <div className="content-card" style={{ padding: '24px' }}>
