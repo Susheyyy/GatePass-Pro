@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car, ChevronLeft, ChevronRight, Menu, Truck, FileText } from 'lucide-react';
 import { notificationApi, residentApi, visitorApi, getUserInfo } from '../services/api';
 import { connectSocket, disconnectSocket } from '../services/socket';
 
@@ -141,6 +141,8 @@ export default function Layout({ children }) {
         { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
         { path: '/residents', label: 'Residents', icon: <Users size={18} /> },
         { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> },
+        { path: '/delivery-entry', label: 'Delivery Entry', icon: <Truck size={18} /> },
+        { path: '/daily-report', label: 'Daily Report', icon: <FileText size={18} /> },
         { path: '/vehicles', label: 'Vehicle Directory', icon: <Car size={18} /> },
         { path: '/community', label: 'Community', icon: <MessageSquare size={18} /> },
         { path: '/profile', label: 'My Profile', icon: <User size={18} /> }
@@ -148,6 +150,8 @@ export default function Layout({ children }) {
     : userRole === 'security'
     ? [
         { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> },
+        { path: '/delivery-entry', label: 'Delivery Entry', icon: <Truck size={18} /> },
+        { path: '/daily-report', label: 'Daily Report', icon: <FileText size={18} /> },
         { path: '/vehicles', label: 'Vehicle Directory', icon: <Car size={18} /> },
         { path: '/profile', label: 'My Profile', icon: <User size={18} /> }
       ]

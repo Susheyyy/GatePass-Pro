@@ -8,6 +8,8 @@ import Profile from './pages/Profile';
 import Community from './pages/Community';
 import Visitors from './pages/Visitors';
 import Vehicles from './pages/Vehicles';
+import DeliveryEntry from './pages/DeliveryEntry';
+import DailyReport from './pages/DailyReport';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastProvider } from './context/ToastContext';
@@ -61,6 +63,22 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <Visitors />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/delivery-entry" element={
+          <ProtectedRoute>
+            <Layout>
+              <DeliveryEntry />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/daily-report" element={
+          <ProtectedRoute>
+            <Layout>
+              <DailyReport />
             </Layout>
           </ProtectedRoute>
         } />

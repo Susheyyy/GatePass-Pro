@@ -1,138 +1,137 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Users,
   UserCheck,
   AlertTriangle,
   Clock,
-  MapPin
+  MapPin,
+  CheckCircle
 } from 'lucide-react';
 import { residentApi, visitorApi } from '../services/api';
 import { getSocket } from '../services/socket';
 
 export default function Dashboard() {
   const [data, setData] = useState({
-    activeVisitors: 0,
+    totalVisitorsToday: 0,
+    checkedInVisitors: 0,
+    checkedOutVisitors: 0,
+    pendingApprovals: 0,
     totalResidents: 0,
     pendingAlerts: 0,
     recentVisitors: []
   });
   const [hourlyData, setHourlyData] = useState([0, 0, 0, 0, 0, 0]);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    try {
+      const residents = await residentApi.getAll();
+      const visitorsList = await visitorApi.getAll();
+
+      const todayString = new Date().toDateString();
+      const todayVisitors = visitorsList.filter(v => new Date(v.createdAt).toDateString() === todayString);
+
+      const totalVisitorsToday = todayVisitors.length;
+      const checkedInVisitors = todayVisitors.filter(v => v.status === 'Checked In').length;
+      const checkedOutVisitors = todayVisitors.filter(v => v.status === 'Checked Out').length;
+      const pendingApprovals = todayVisitors.filter(v => v.status === 'Pending').length;
+
+      let pendingAlerts = 0;
+      residents.forEach(r => {
+        if (r.distressStatus === 'Active') {
+          pendingAlerts += 1;
+        }
+      });
+
+      const buckets = [0, 0, 0, 0, 0, 0];
+      visitorsList.forEach(v => {
+        if (v.checkedInAt) {
+          const hr = new Date(v.checkedInAt).getHours();
+          const idx = Math.floor(hr / 4);
+          buckets[idx]++;
+        }
+      });
+      setHourlyData(buckets);
+
+      const recent = visitorsList.slice(0, 4);
+
+      setData({
+        totalVisitorsToday,
+        checkedInVisitors,
+        checkedOutVisitors,
+        pendingApprovals,
+        totalResidents: residents.length,
+        pendingAlerts,
+        recentVisitors: recent
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    document.title = 'Dashboard | GatePass Pro';
+    loadData();
+  }, []);
 
   useEffect(() => {
     const socket = getSocket();
     if (socket) {
-      const handleVisitorChange = (updatedVisitor) => {
-        setData(prev => {
-          const exists = prev.recentVisitors.some(v => v._id === updatedVisitor._id);
-          let updatedRecent = prev.recentVisitors;
-          if (exists) {
-            updatedRecent = prev.recentVisitors.map(v => v._id === updatedVisitor._id ? updatedVisitor : v);
-          } else {
-            updatedRecent = [updatedVisitor, ...prev.recentVisitors].slice(0, 4);
-          }
-
-          let diffActive = 0;
-          const wasActive = prev.recentVisitors.find(v => v._id === updatedVisitor._id)?.status === 'Checked In';
-          const isActive = updatedVisitor.status === 'Checked In';
-          if (!wasActive && isActive) diffActive = 1;
-          if (wasActive && !isActive) diffActive = -1;
-
-          return {
-            ...prev,
-            activeVisitors: Math.max(0, prev.activeVisitors + diffActive),
-            recentVisitors: updatedRecent
-          };
-        });
+      const handleUpdate = () => {
+        loadData();
       };
 
-      const handleDistressChange = () => {
-        residentApi.getAll().then(residents => {
-          let pendingAlerts = 0;
-          residents.forEach(r => {
-            if (r.distressStatus === 'Active') {
-              pendingAlerts += 1;
-            }
-          });
-          setData(prev => ({
-            ...prev,
-            pendingAlerts
-          }));
-        });
-      };
-
-      socket.on('distress_alert', handleDistressChange);
-      socket.on('distress_resolved', handleDistressChange);
-      socket.on('visitor_approval_changed', handleVisitorChange);
-      socket.on('visitor_check_status', handleVisitorChange);
+      socket.on('distress_alert', handleUpdate);
+      socket.on('distress_resolved', handleUpdate);
+      socket.on('visitor_approval_changed', handleUpdate);
+      socket.on('visitor_check_status', handleUpdate);
 
       return () => {
-        socket.off('distress_alert', handleDistressChange);
-        socket.off('distress_resolved', handleDistressChange);
-        socket.off('visitor_approval_changed', handleVisitorChange);
-        socket.off('visitor_check_status', handleVisitorChange);
+        socket.off('distress_alert', handleUpdate);
+        socket.off('distress_resolved', handleUpdate);
+        socket.off('visitor_approval_changed', handleUpdate);
+        socket.off('visitor_check_status', handleUpdate);
       };
     }
   }, []);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    document.title = 'Dashboard | GatePass Pro';
-    const loadData = async () => {
-      try {
-        const residents = await residentApi.getAll();
-        const visitorsList = await visitorApi.getAll();
-
-        const activeVisitors = visitorsList.filter(v => v.status === 'Checked In').length;
-
-        let pendingAlerts = 0;
-        residents.forEach(r => {
-          if (r.distressStatus === 'Active') {
-            pendingAlerts += 1;
-          }
-        });
-
-        const buckets = [0, 0, 0, 0, 0, 0];
-        visitorsList.forEach(v => {
-          if (v.checkedInAt) {
-            const hr = new Date(v.checkedInAt).getHours();
-            const idx = Math.floor(hr / 4);
-            buckets[idx]++;
-          }
-        });
-        setHourlyData(buckets);
-
-        const recent = visitorsList.slice(0, 4);
-
-        setData({
-          activeVisitors,
-          totalResidents: residents.length,
-          pendingAlerts,
-          recentVisitors: recent
-        });
-      } catch (err) {
-        console.error('Error fetching dashboard stats:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
-
 
   const stats = [
     {
-      label: 'Active Visitors',
-      value: loading ? '...' : data.activeVisitors.toString(),
+      label: 'Total Visitors Today',
+      value: loading ? '...' : data.totalVisitorsToday.toString(),
       icon: <Users size={22} />,
       color: 'var(--primary)',
       bg: 'var(--primary-light)'
     },
     {
-      label: 'Total Residents',
-      value: loading ? '...' : data.totalResidents.toString(),
+      label: 'Checked-In Visitors',
+      value: loading ? '...' : data.checkedInVisitors.toString(),
       icon: <UserCheck size={22} />,
       color: 'var(--success)',
       bg: 'var(--success-light)'
+    },
+    {
+      label: 'Checked-Out Visitors',
+      value: loading ? '...' : data.checkedOutVisitors.toString(),
+      icon: <CheckCircle size={22} />,
+      color: 'var(--text-muted)',
+      bg: 'var(--border)'
+    },
+    {
+      label: 'Pending Approvals',
+      value: loading ? '...' : data.pendingApprovals.toString(),
+      icon: <Clock size={22} />,
+      color: 'var(--warning)',
+      bg: 'var(--warning-light)'
+    },
+    {
+      label: 'Total Residents',
+      value: loading ? '...' : data.totalResidents.toString(),
+      icon: <Users size={22} />,
+      color: 'var(--primary)',
+      bg: 'var(--primary-light)'
     },
     {
       label: 'Pending Alerts',
@@ -312,7 +311,6 @@ export default function Dashboard() {
             )}
           </div>
       </div>
-
 
     </div>
   );

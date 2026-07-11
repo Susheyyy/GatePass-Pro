@@ -85,7 +85,8 @@ const addVisitor = async (req, res) => {
       passcode: generatedPasscode,
       status: status || 'Pending',
       purpose,
-      vehicleNumber
+      vehicleNumber,
+      checkedInAt: status === 'Checked In' ? new Date() : undefined
     });
 
     if (req.io) {
