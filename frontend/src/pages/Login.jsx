@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { residentApi } from '../services/api';
 
 export default function Login() {
@@ -751,7 +751,6 @@ export default function Login() {
                   <span className="spinner"></span>
                 ) : (
                   <>
-                    <KeyRound size={16} />
                     <span>Reset & Sign In</span>
                   </>
                 )}

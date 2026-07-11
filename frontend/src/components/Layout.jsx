@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import { notificationApi, residentApi, visitorApi, getUserInfo } from '../services/api';
 import { connectSocket, disconnectSocket } from '../services/socket';
 
@@ -224,9 +224,39 @@ export default function Layout({ children }) {
         </div>
       )}
       <header className="main-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button 
+            onClick={() => {
+              const newState = !isSidebarCollapsed;
+              setIsSidebarCollapsed(newState);
+              localStorage.setItem('sidebar_collapsed', newState);
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px',
+              borderRadius: '8px',
+              transition: 'var(--transition)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--primary-light)';
+              e.currentTarget.style.color = 'var(--primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--text-muted)';
+            }}
+            aria-label="Toggle Sidebar"
+          >
+            <Menu size={20} />
+          </button>
           <Link to="/" style={{ textDecoration: 'none' }}>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.025em', color: 'var(--text-main)', cursor: 'pointer' }}>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.025em', color: 'var(--text-main)', cursor: 'pointer', margin: 0 }}>
               GatePass <span style={{ color: 'var(--primary)' }}>Pro</span>
             </h1>
           </Link>
@@ -420,18 +450,7 @@ export default function Layout({ children }) {
 
       <div className="layout-body">
         <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-          <button 
-            onClick={() => {
-              const newState = !isSidebarCollapsed;
-              setIsSidebarCollapsed(newState);
-              localStorage.setItem('sidebar_collapsed', newState);
-            }} 
-            className="sidebar-toggle-btn"
-            aria-label="Toggle Sidebar"
-          >
-            {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            {!isSidebarCollapsed && <span>Collapse</span>}
-          </button>
+
           
           <div className="sidebar-nav-links">
             {navItems.map((item) => {
