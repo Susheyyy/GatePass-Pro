@@ -77,8 +77,7 @@ export default function Layout({ children }) {
     const loadAvatar = () => {
       if (userRole === 'resident') {
         residentApi.getAll().then(list => {
-          const email = residentEmail;
-          const current = list.find(r => r.gmail === email);
+          const current = list.find(r => r.email.toLowerCase() === residentEmail?.toLowerCase() || r.gmail.toLowerCase() === residentEmail?.toLowerCase());
           if (current && current.avatar) {
             setAvatar(current.avatar);
           }
