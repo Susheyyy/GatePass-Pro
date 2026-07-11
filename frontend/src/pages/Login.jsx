@@ -114,7 +114,7 @@ export default function Login() {
         otp: enteredOtp.trim()
       });
 
-       const loginRes = await residentApi.login(updatedResident.email, newPassword);
+      const loginRes = await residentApi.login(updatedResident.email, newPassword);
       sessionStorage.setItem('gatepass_token', loginRes.token);
       setIsLoading(false);
       navigate('/resident-dashboard');
@@ -169,12 +169,12 @@ export default function Login() {
   };
 
   return (
-    <div style={{ 
-      position: 'relative', 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      minHeight: '100vh', 
+    <div style={{
+      position: 'relative',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
       backgroundColor: '#f5f0f6',
       overflow: 'hidden',
       padding: '40px 16px',
@@ -218,9 +218,9 @@ export default function Login() {
         flexDirection: 'column',
         gap: '28px'
       }}>
-        
+
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
-   
+
           <div>
             <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.03em' }}>
               {isResetView ? 'Configure Account' : isForgotView ? 'Forgot Password' : isForgotResetView ? 'Reset Password' : 'GatePass Pro'}
@@ -575,7 +575,7 @@ export default function Login() {
                 </>
               )}
             </button>
-            
+
             <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               New resident?{' '}
               <button
@@ -601,23 +601,23 @@ export default function Login() {
                 Enter OTP Code
               </label>
               <input
-                  type="text"
-                  value={enteredOtp}
-                  onChange={(e) => { setEnteredOtp(e.target.value); setValidationError(''); }}
-                  placeholder="6-digit verification code"
-                  required
-                  disabled={isLoading}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border)',
-                    fontSize: '0.9rem',
-                    outline: 'none',
-                    fontFamily: 'var(--font-sans)',
-                    backgroundColor: 'white'
-                  }}
-                />
+                type="text"
+                value={enteredOtp}
+                onChange={(e) => { setEnteredOtp(e.target.value); setValidationError(''); }}
+                placeholder="6-digit verification code"
+                required
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  fontFamily: 'var(--font-sans)',
+                  backgroundColor: 'white'
+                }}
+              />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

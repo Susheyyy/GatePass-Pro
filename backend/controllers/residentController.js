@@ -111,7 +111,7 @@ const addResident = async (req, res) => {
       gmail,
       members,
       otp: generatedOtp,
-      otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      otpExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
       password: 'resident123',
       isFirstLogin: true,
       communityId: generatedCommunityId,
@@ -131,19 +131,29 @@ const addResident = async (req, res) => {
     }
     
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const link = `${frontendUrl}/login?email=${generatedEmail}`;
     
-    
-
-    console.log(`\n=================== REGISTRATION RECEIVED EMAIL PENDING SEND ===================\nTo: ${gmail}\nRegistration pending admin approval.\n================================================================================\n`);
-    sendEmail({
-      to: gmail,
-      subject: 'GatePass Pro - Registration Received',
-      text: `Hello ${name},\n\nYour resident account registration request for Flat ${flatNo} has been received and is currently pending administrator approval.\n\nOnce approved, you will receive a follow-up email with your login credentials and verification code.`
-    })
-      .catch((mailError) => {
-        console.log(`[Email Workaround] Registration received email failed to send to ${gmail}`);
-      });
+    if (isResidentAdding) {
+      const link = `${frontendUrl}/login?email=${generatedEmail}&otp=${generatedOtp}`;
+      console.log(`\n=================== REGISTRATION APPROVED EMAIL PENDING SEND ===================\nTo: ${gmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n================================================================================\n`);
+      sendEmail({
+        to: gmail,
+        subject: 'GatePass Pro - Resident Account Created',
+        text: `Hello ${name},\n\nYour resident account has been created by the flat owner.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}\n\nUpon first login, you will be required to change your password using the OTP.`
+      })
+        .catch((mailError) => {
+          console.log(`[Email Workaround] Welcome email failed to send to ${gmail}. Credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
+        });
+    } else {
+      console.log(`\n=================== REGISTRATION RECEIVED EMAIL PENDING SEND ===================\nTo: ${gmail}\nRegistration pending admin approval.\n================================================================================\n`);
+      sendEmail({
+        to: gmail,
+        subject: 'GatePass Pro - Registration Received',
+        text: `Hello ${name},\n\nYour resident account registration request for Flat ${flatNo} has been received and is currently pending administrator approval.\n\nOnce approved, you will receive a follow-up email with your login credentials and verification code.`
+      })
+        .catch((mailError) => {
+          console.log(`[Email Workaround] Registration received email failed to send to ${gmail}`);
+        });
+    }
     
     const responseObj = resident.toObject();
     delete responseObj.otp;
@@ -219,16 +229,18 @@ const updateResident = async (req, res) => {
       }
       
       if (status === 'Approved' && wasPending) {
+        const freshOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        resident.otp = freshOtp;
+        resident.otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); 
+        
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const link = `${frontendUrl}/login?email=${resident.email}&otp=${resident.otp}`;
+        const link = `${frontendUrl}/login?email=${resident.email}&otp=${freshOtp}`;
         
-        
-
-        console.log(`\n=================== APPROVAL EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${resident.otp}\nLogin Link: ${link}\n=======================================================================\n`);
+        console.log(`\n=================== APPROVAL EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${freshOtp}\nLogin Link: ${link}\n=======================================================================\n`);
         sendEmail({
           to: resident.gmail,
           subject: 'GatePass Pro - Resident Account Approved',
-          text: `Hello ${resident.name},\n\nYour resident account registration request has been approved.\n\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${resident.otp}\n\nPlease click the link below to verify and sign in:\n${link}`
+          text: `Hello ${resident.name},\n\nYour resident account registration request has been approved.\n\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${freshOtp}\n\nPlease click the link below to verify and sign in:\n${link}`
         })
           .catch((mailError) => {
             console.log(`[Email Workaround] Retrievable credentials: User=${resident.email}, OTP=${resident.otp}, Link=${link}`);
@@ -342,7 +354,7 @@ const resendOtp = async (req, res) => {
     }
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     resident.otp = generatedOtp;
-    resident.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    resident.otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await resident.save();
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -384,7 +396,7 @@ const forgotPassword = async (req, res) => {
     }
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     resident.otp = generatedOtp;
-    resident.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    resident.otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await resident.save();
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -622,6 +634,7 @@ const bulkCreateResidents = async (req, res) => {
         gmail: formattedGmail,
         members: parseInt(members) || 1,
         otp: generatedOtp,
+        otpExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
         password: 'resident123',
         isFirstLogin: true,
         communityId: generatedCommunityId,

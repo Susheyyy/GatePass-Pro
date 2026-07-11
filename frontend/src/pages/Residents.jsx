@@ -516,10 +516,10 @@ export default function Residents() {
                             </button>
                           </>
                         )}
-                        {resident.status !== 'Approved' && (
+                        {resident.status === 'Approved' && resident.isFirstLogin === true && (
                           <button 
                             onClick={() => handleResendOtp(resident)}
-                            title="Resend OTP Email"
+                            title="Regenerate & Resend OTP"
                             style={{
                               background: 'none',
                               border: 'none',
