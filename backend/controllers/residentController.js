@@ -1,17 +1,5 @@
 const Resident = require('../models/Resident');
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: String(process.env.SMTP_PORT) === '465',
-  auth: {
-    user: process.env.SMTP_MAIL,
-    pass: process.env.SMTP_PASSWORD
-  },
-  debug: true,
-  logger: true
-});
+const { sendEmail } = require('../config/mailer');
 
 const getResidents = async (req, res) => {
   try {
@@ -145,21 +133,17 @@ const addResident = async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const link = `${frontendUrl}/login?email=${generatedEmail}`;
     
-    const mailOptions = {
-      from: process.env.SMTP_MAIL,
+    
+
+    console.log(`\n=================== REGISTRATION EMAIL PENDING SEND ===================\nTo: ${gmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n========================================================================\n`);
+    sendEmail({
       to: gmail,
       subject: 'GatePass Pro - Resident Account Created',
       text: `Hello ${name},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}\n\nUpon first login, you will be required to change your password using the OTP.`
-    };
-    
-    console.log(`\n=================== REGISTRATION EMAIL PENDING SEND ===================\nTo: ${gmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n========================================================================\n`);
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log('Email sent successfully via SMTP!');
-    } catch (mailError) {
-      console.error('Mail Send Error (Registration Request):', mailError.message);
-      console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
-    }
+    })
+      .catch((mailError) => {
+        console.log(`[Email Workaround] Retrievable credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
+      });
     
     const responseObj = resident.toObject();
     delete responseObj.otp;
@@ -238,21 +222,17 @@ const updateResident = async (req, res) => {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const link = `${frontendUrl}/login?email=${resident.email}&otp=${resident.otp}`;
         
-        const mailOptions = {
-          from: process.env.SMTP_MAIL,
+        
+
+        console.log(`\n=================== APPROVAL EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${resident.otp}\nLogin Link: ${link}\n=======================================================================\n`);
+        sendEmail({
           to: resident.gmail,
           subject: 'GatePass Pro - Resident Account Approved',
           text: `Hello ${resident.name},\n\nYour resident account registration request has been approved.\n\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${resident.otp}\n\nPlease click the link below to verify and sign in:\n${link}`
-        };
-        
-        console.log(`\n=================== APPROVAL EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${resident.otp}\nLogin Link: ${link}\n=======================================================================\n`);
-        try {
-          await transporter.sendMail(mailOptions);
-          console.log('Email sent successfully via SMTP!');
-        } catch (mailError) {
-          console.error('Mail Send Error (Approved Welcome):', mailError.message);
-          console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${resident.email}, OTP=${resident.otp}, Link=${link}`);
-        }
+        })
+          .catch((mailError) => {
+            console.log(`[Email Workaround] Retrievable credentials: User=${resident.email}, OTP=${resident.otp}, Link=${link}`);
+          });
       }
       resident.bio = bio !== undefined ? bio : resident.bio;
       resident.location = location !== undefined ? location : resident.location;
@@ -368,21 +348,17 @@ const resendOtp = async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const link = `${frontendUrl}/login?email=${resident.email}`;
     
-    const mailOptions = {
-      from: process.env.SMTP_MAIL,
+    
+
+    console.log(`\n=================== RESEND OTP EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nNew OTP: ${generatedOtp}\nLogin Link: ${link}\n======================================================================\n`);
+    sendEmail({
       to: resident.gmail,
       subject: 'GatePass Pro - New Verification OTP',
       text: `Hello ${resident.name},\n\nYour new verification OTP has been generated.\n\nUsername: ${resident.email}\nDefault Password: resident123\nNew Verification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
-    };
-
-    console.log(`\n=================== RESEND OTP EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nNew OTP: ${generatedOtp}\nLogin Link: ${link}\n======================================================================\n`);
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log('Email sent successfully via SMTP!');
-    } catch (mailError) {
-      console.error('Mail Send Error (Resend OTP):', mailError.message);
-      console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${resident.email}, New OTP=${generatedOtp}, Link=${link}`);
-    }
+    })
+      .catch((mailError) => {
+        console.log(`[Email Workaround] Retrievable credentials: User=${resident.email}, New OTP=${generatedOtp}, Link=${link}`);
+      });
 
     res.status(200).json({ message: 'New OTP sent successfully' });
   } catch (error) {
@@ -414,21 +390,17 @@ const forgotPassword = async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const link = `${frontendUrl}/login?email=${resident.email}`;
 
-    const mailOptions = {
-      from: process.env.SMTP_MAIL,
+    
+
+    console.log(`\n=================== FORGOT PASSWORD EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nReset OTP: ${generatedOtp}\nReset Link: ${link}\n=========================================================================\n`);
+    sendEmail({
       to: resident.gmail,
       subject: 'GatePass Pro - Password Reset OTP',
       text: `Hello ${resident.name},\n\nWe received a request to reset your password.\n\nUsername: ${resident.email}\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to verify and choose a new password:\n${link}`
-    };
-
-    console.log(`\n=================== FORGOT PASSWORD EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nReset OTP: ${generatedOtp}\nReset Link: ${link}\n=========================================================================\n`);
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log('Email sent successfully via SMTP!');
-    } catch (mailError) {
-      console.error('Mail Send Error (Forgot Password OTP):', mailError.message);
-      console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${resident.email}, OTP=${generatedOtp}, Link=${link}`);
-    }
+    })
+      .catch((mailError) => {
+        console.log(`[Email Workaround] Retrievable credentials: User=${resident.email}, OTP=${generatedOtp}, Link=${link}`);
+      });
 
     res.status(200).json({ message: 'Verification OTP sent to your registered Gmail address' });
   } catch (error) {
@@ -659,21 +631,17 @@ const bulkCreateResidents = async (req, res) => {
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const link = `${frontendUrl}/login?email=${generatedEmail}&otp=${generatedOtp}`;
-      const mailOptions = {
-        from: process.env.SMTP_MAIL,
+      
+
+      console.log(`\n=================== BULK IMPORT EMAIL PENDING SEND ===================\nTo: ${formattedGmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n=======================================================================\n`);
+      sendEmail({
         to: formattedGmail,
         subject: 'GatePass Pro - Resident Account Created',
         text: `Hello ${cleanName},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
-      };
-
-      console.log(`\n=================== BULK IMPORT EMAIL PENDING SEND ===================\nTo: ${formattedGmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n=======================================================================\n`);
-      try {
-        await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully via SMTP!');
-      } catch (mailError) {
-        console.error('Mail Send Error (Bulk Import Account):', mailError.message);
-        console.log(`[SMTP BLOCK WORKAROUND] Retrievable credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
-      }
+      })
+        .catch((mailError) => {
+          console.log(`[Email Workaround] Retrievable credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
+        });
 
       created.push(newResident);
     }
