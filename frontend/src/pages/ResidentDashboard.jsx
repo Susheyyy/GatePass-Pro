@@ -66,7 +66,8 @@ export default function ResidentDashboard() {
     name: '',
     type: 'Guest',
     mobile: '',
-    purpose: ''
+    purpose: '',
+    vehicleNumber: ''
   });
 
   const { residentId, email: residentEmail } = getUserInfo();
@@ -159,7 +160,7 @@ export default function ResidentDashboard() {
       });
       setVisitors(prev => [newVisitor, ...prev]);
       setIsPassModalOpen(false);
-      setVisitorForm({ name: '', type: 'Guest', mobile: '', purpose: '' });
+      setVisitorForm({ name: '', type: 'Guest', mobile: '', purpose: '', vehicleNumber: '' });
       toast.success('Pre-approved pass created successfully!');
     } catch (err) {
       toast.error('Failed to create pre-approved pass.');
@@ -775,7 +776,6 @@ export default function ResidentDashboard() {
                   }}
                 >
                   <option value="Guest">Guest</option>
-                  <option value="Delivery">Delivery</option>
                   <option value="Cab">Cab</option>
                   <option value="Maintenance">Maintenance</option>
                   <option value="Other">Other</option>
@@ -796,6 +796,13 @@ export default function ResidentDashboard() {
                 onChange={(e) => setVisitorForm(prev => ({ ...prev, purpose: e.target.value }))}
                 placeholder="Enter purpose of visit"
                 required
+              />
+
+              <FormInput
+                label="Vehicle Number (Optional)"
+                value={visitorForm.vehicleNumber}
+                onChange={(e) => setVisitorForm(prev => ({ ...prev, vehicleNumber: e.target.value }))}
+                placeholder="Enter vehicle number"
               />
 
               <div style={{ display: 'flex', gap: '12px', marginTop: 'auto', paddingTop: '24px' }}>

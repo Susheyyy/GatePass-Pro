@@ -8,7 +8,7 @@ import {
   Building, 
   AlertCircle,
 } from 'lucide-react';
-import { residentApi, getUserInfo } from '../services/api';
+import { residentApi, visitorApi, getUserInfo } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
@@ -19,6 +19,7 @@ export default function Vehicles() {
   const [loading, setLoading] = useState(true);
   const [residents, setResidents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visitors, setVisitors] = useState([]);
   const [myResidentProfile, setMyResidentProfile] = useState(null);
   const [newVehicleNumber, setNewVehicleNumber] = useState('');
   const [savingVehicle, setSavingVehicle] = useState(false);
@@ -30,6 +31,8 @@ export default function Vehicles() {
       setLoading(true);
       const list = await residentApi.getAll();
       setResidents(list);
+      const visitorList = await visitorApi.getAll();
+      setVisitors(visitorList);
       
       if (userRole === 'resident') {
         let matched = null;
@@ -121,7 +124,7 @@ export default function Vehicles() {
   };
 
   
-  const filteredVehicles = residents.reduce((acc, res) => {
+  const residentVehicles = residents.reduce((acc, res) => {
     const vehiclesList = res.vehicles || [];
     vehiclesList.forEach(veh => {
       const matchSearch = 
@@ -135,12 +138,36 @@ export default function Vehicles() {
           ownerName: res.name,
           flatNo: res.flatNo,
           mobile: res.mobile,
-          residentId: res._id
+          residentId: res._id,
+          isGuest: false
         });
       }
     });
     return acc;
   }, []);
+
+  const visitorVehicles = visitors.reduce((acc, visitor) => {
+    if (visitor.vehicleNumber && visitor.status === 'Checked In') {
+      const matchSearch =
+        visitor.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        visitor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        visitor.flatNo.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (matchSearch) {
+        acc.push({
+          vehicleNumber: visitor.vehicleNumber,
+          ownerName: visitor.name,
+          flatNo: visitor.flatNo,
+          mobile: visitor.mobile,
+          residentId: visitor._id,
+          isGuest: true
+        });
+      }
+    }
+    return acc;
+  }, []);
+
+  const filteredVehicles = [...residentVehicles, ...visitorVehicles];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
@@ -335,8 +362,21 @@ export default function Vehicles() {
                         }}>
                           {initials}
                         </div>
-                        <span style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '0.9rem' }}>
+                        <span style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           {entry.ownerName}
+                          {entry.isGuest && (
+                            <span style={{
+                              fontSize: '0.7rem',
+                              fontWeight: '700',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--warning-light)',
+                              color: 'var(--warning)',
+                              lineHeight: 1
+                            }}>
+                              Guest
+                            </span>
+                          )}
                         </span>
                       </td>
 

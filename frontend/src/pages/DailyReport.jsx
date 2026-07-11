@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
-import { FileText, Users, UserCheck, Clock, CheckCircle, Search, Download } from 'lucide-react';
-import { visitorApi } from '../services/api';
+import { Navigate } from 'react-router-dom';
+import { Users, UserCheck, Clock, CheckCircle, Search, Download } from 'lucide-react';
+import { visitorApi, getUserInfo } from '../services/api';
 import { FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
 
 export default function DailyReport() {
+  const { role } = getUserInfo();
+  if (role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
   const toast = useToast();
   const [visitors, setVisitors] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,7 +87,6 @@ export default function DailyReport() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <FileText size={28} style={{ color: 'var(--primary)' }} />
             <span>Daily Reports & Activity</span>
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '4px' }}>

@@ -11,7 +11,8 @@ export function FormInput({
   max,
   name,
   disabled = false,
-  style = {}
+  style = {},
+  list
 }) {
   return (
     <div style={{ marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '6px', ...style }}>
@@ -31,6 +32,7 @@ export function FormInput({
           min={min}
           max={max}
           disabled={disabled}
+          list={list}
           className="input-field"
           style={{
             paddingLeft: Icon ? '46px' : '16px',

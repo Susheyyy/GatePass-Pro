@@ -528,7 +528,6 @@ export default function Visitors() {
                   }}
                 >
                   <option value="Guest">Guest</option>
-                  <option value="Delivery">Delivery</option>
                   <option value="Cab">Cab</option>
                   <option value="Maintenance">Maintenance</option>
                   <option value="Other">Other</option>

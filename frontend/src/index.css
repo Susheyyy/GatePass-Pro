@@ -287,20 +287,10 @@ body {
 }
 
 .sidebar.collapsed {
-  width: 80px;
-  padding: 24px 12px;
-}
-
-.sidebar.collapsed .sidebar-link span,
-.sidebar.collapsed .sidebar-toggle-btn span {
-  display: none;
-}
-
-.sidebar.collapsed .sidebar-link,
-.sidebar.collapsed .sidebar-toggle-btn {
-  justify-content: center;
-  padding: 12px;
-  gap: 0;
+  width: 0px !important;
+  padding: 0px !important;
+  border-right: none !important;
+  overflow: hidden !important;
 }
 
 .sidebar-link {
@@ -462,6 +452,10 @@ body {
     border-bottom: 1px solid var(--border) !important;
     border-right: none !important;
     align-items: center;
+  }
+  
+  .sidebar.collapsed {
+    display: none !important;
   }
   
   .sidebar-link {

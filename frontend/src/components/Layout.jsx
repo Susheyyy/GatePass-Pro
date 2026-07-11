@@ -55,7 +55,7 @@ export default function Layout({ children }) {
   const [distressBanners, setDistressBanners] = useState([]);
   const [avatar, setAvatar] = useState('avatar1');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
-    localStorage.getItem('sidebar_collapsed') === 'true'
+    localStorage.getItem('sidebar_collapsed') !== 'false'
   );
 
 
@@ -150,7 +150,6 @@ export default function Layout({ children }) {
     ? [
         { path: '/visitors', label: 'Visitors', icon: <ShieldAlert size={18} /> },
         { path: '/delivery-entry', label: 'Delivery Entry', icon: <Truck size={18} /> },
-        { path: '/daily-report', label: 'Daily Report', icon: <FileText size={18} /> },
         { path: '/vehicles', label: 'Vehicle Directory', icon: <Car size={18} /> },
         { path: '/profile', label: 'My Profile', icon: <User size={18} /> }
       ]
@@ -470,7 +469,6 @@ export default function Layout({ children }) {
                   to={item.path}
                   className={`sidebar-link ${isActive ? 'active' : ''}`}
                 >
-                  {item.icon}
                   <span>{item.label}</span>
                 </Link>
               );
@@ -478,9 +476,6 @@ export default function Layout({ children }) {
           </div>
           
           <div className="sidebar-logout-container">
-
-
-
             <button 
               onClick={handleLogout} 
               className="sidebar-link" 
@@ -495,7 +490,6 @@ export default function Layout({ children }) {
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-light)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-              <LogOut size={18} />
               <span>Sign Out</span>
             </button>
           </div>
