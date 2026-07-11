@@ -135,14 +135,14 @@ const addResident = async (req, res) => {
     
     
 
-    console.log(`\n=================== REGISTRATION EMAIL PENDING SEND ===================\nTo: ${gmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n========================================================================\n`);
+    console.log(`\n=================== REGISTRATION RECEIVED EMAIL PENDING SEND ===================\nTo: ${gmail}\nRegistration pending admin approval.\n================================================================================\n`);
     sendEmail({
       to: gmail,
-      subject: 'GatePass Pro - Resident Account Created',
-      text: `Hello ${name},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}\n\nUpon first login, you will be required to change your password using the OTP.`
+      subject: 'GatePass Pro - Registration Received',
+      text: `Hello ${name},\n\nYour resident account registration request for Flat ${flatNo} has been received and is currently pending administrator approval.\n\nOnce approved, you will receive a follow-up email with your login credentials and verification code.`
     })
       .catch((mailError) => {
-        console.log(`[Email Workaround] Retrievable credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
+        console.log(`[Email Workaround] Registration received email failed to send to ${gmail}`);
       });
     
     const responseObj = resident.toObject();
