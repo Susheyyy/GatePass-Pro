@@ -99,6 +99,7 @@ export default function Profile() {
         setProfile(updated);
       }
       toast.success('Profile details updated successfully!');
+      window.dispatchEvent(new Event('profile_updated'));
     } catch (err) {
       toast.error('Failed to save profile details.');
     } finally {

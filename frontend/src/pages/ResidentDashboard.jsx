@@ -65,7 +65,8 @@ export default function ResidentDashboard() {
   const [visitorForm, setVisitorForm] = useState({
     name: '',
     type: 'Guest',
-    mobile: ''
+    mobile: '',
+    purpose: ''
   });
 
   const { residentId, email: residentEmail } = getUserInfo();
@@ -158,7 +159,7 @@ export default function ResidentDashboard() {
       });
       setVisitors(prev => [newVisitor, ...prev]);
       setIsPassModalOpen(false);
-      setVisitorForm({ name: '', type: 'Guest', mobile: '' });
+      setVisitorForm({ name: '', type: 'Guest', mobile: '', purpose: '' });
       toast.success('Pre-approved pass created successfully!');
     } catch (err) {
       toast.error('Failed to create pre-approved pass.');
@@ -178,6 +179,26 @@ export default function ResidentDashboard() {
   const handleViewPass = (visitor) => {
     setSelectedVisitorForPass(visitor);
     setIsPassDetailOpen(true);
+  };
+
+  const handleDownloadQr = async () => {
+    if (!selectedVisitorForPass) return;
+    try {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(selectedVisitorForPass.passcode)}`;
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `pass-${selectedVisitorForPass.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      toast.success('QR Code downloaded successfully!');
+    } catch (err) {
+      toast.error('Failed to download QR Code. Please try again.');
+    }
   };
 
   const handleRejectVisitor = async (visitorId) => {
@@ -769,6 +790,14 @@ export default function ResidentDashboard() {
                 required
               />
 
+              <FormInput
+                label="Purpose of Visit"
+                value={visitorForm.purpose}
+                onChange={(e) => setVisitorForm(prev => ({ ...prev, purpose: e.target.value }))}
+                placeholder="Enter purpose of visit"
+                required
+              />
+
               <div style={{ display: 'flex', gap: '12px', marginTop: 'auto', paddingTop: '24px' }}>
                 <FormButton onClick={() => setIsPassModalOpen(false)} variant="secondary" style={{ flex: 1 }}>
                   Cancel
@@ -1129,9 +1158,14 @@ export default function ResidentDashboard() {
               </div>
             </div>
             
-            <FormButton onClick={() => { setIsPassDetailOpen(false); setSelectedVisitorForPass(null); }} variant="primary" style={{ width: '100%' }}>
-              Close Pass
-            </FormButton>
+            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+              <FormButton onClick={handleDownloadQr} variant="secondary" style={{ flex: 1 }}>
+                Download QR
+              </FormButton>
+              <FormButton onClick={() => { setIsPassDetailOpen(false); setSelectedVisitorForPass(null); }} variant="primary" style={{ flex: 1 }}>
+                Close Pass
+              </FormButton>
+            </div>
           </div>
         </div>
       )}

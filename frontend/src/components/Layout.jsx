@@ -74,28 +74,33 @@ export default function Layout({ children }) {
   };
 
   useEffect(() => {
-    if (userRole === 'resident') {
-      residentApi.getAll().then(list => {
-        const email = residentEmail;
-        const current = list.find(r => r.gmail === email);
-        if (current && current.avatar) {
-          setAvatar(current.avatar);
-        }
-      }).catch(() => {});
-    }
+    const loadAvatar = () => {
+      if (userRole === 'resident') {
+        residentApi.getAll().then(list => {
+          const email = residentEmail;
+          const current = list.find(r => r.gmail === email);
+          if (current && current.avatar) {
+            setAvatar(current.avatar);
+          }
+        }).catch(() => {});
+      }
+    };
 
+    loadAvatar();
+    window.addEventListener('profile_updated', loadAvatar);
+
+    let socket;
     if (userRole === 'admin' || userRole === 'security' || (userRole === 'resident' && flatNo)) {
       if (userRole === 'admin' || (userRole === 'resident' && flatNo)) {
         fetchNotifications();
       }
 
-      const socket = connectSocket(userRole, flatNo);
+      socket = connectSocket(userRole, flatNo);
 
       if (socket) {
         socket.on('new_notification', (newNotif) => {
           setNotifications(prev => [newNotif, ...prev]);
         });
-
 
         if (userRole === 'admin') {
           socket.on('distress_alert', (data) => {
@@ -114,19 +119,20 @@ export default function Layout({ children }) {
           });
         }
       }
-
-      return () => {
-        if (socket) {
-          socket.off('new_notification');
-          if (userRole === 'admin') {
-            socket.off('distress_alert');
-            socket.off('distress_resolved');
-          }
-        }
-        disconnectSocket();
-      };
     }
-  }, [userRole, flatNo]);
+
+    return () => {
+      window.removeEventListener('profile_updated', loadAvatar);
+      if (socket) {
+        socket.off('new_notification');
+        if (userRole === 'admin') {
+          socket.off('distress_alert');
+          socket.off('distress_resolved');
+        }
+      }
+      disconnectSocket();
+    };
+  }, [userRole, flatNo, residentEmail]);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 

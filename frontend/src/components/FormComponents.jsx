@@ -10,10 +10,11 @@ export function FormInput({
   min,
   max,
   name,
-  disabled = false
+  disabled = false,
+  style = {}
 }) {
   return (
-    <div style={{ marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div style={{ marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '6px', ...style }}>
       {label && (
         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)' }}>
           {label} {required && <span style={{ color: 'var(--accent)' }}>*</span>}
