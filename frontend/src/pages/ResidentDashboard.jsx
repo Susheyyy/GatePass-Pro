@@ -83,7 +83,7 @@ export default function ResidentDashboard() {
         matched = await residentApi.getById(residentId);
       } else {
         const list = await residentApi.getAll();
-        matched = list.find(r => r.email.toLowerCase() === residentEmail?.toLowerCase());
+        matched = list.find(r => r.email?.toLowerCase() === residentEmail?.toLowerCase());
       }
       if (matched) {
         setResident(matched);
@@ -159,6 +159,8 @@ export default function ResidentDashboard() {
         status: 'Approved'
       });
       setVisitors(prev => [newVisitor, ...prev]);
+      setSelectedVisitorForPass(newVisitor);
+      setIsPassDetailOpen(true);
       setIsPassModalOpen(false);
       setVisitorForm({ name: '', type: 'Guest', mobile: '', purpose: '', vehicleNumber: '' });
       toast.success('Pre-approved pass created successfully!');
@@ -182,24 +184,16 @@ export default function ResidentDashboard() {
     setIsPassDetailOpen(true);
   };
 
-  const handleDownloadQr = async () => {
-    if (!selectedVisitorForPass) return;
-    try {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(selectedVisitorForPass.passcode)}`;
-      const response = await fetch(qrUrl);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `pass-${selectedVisitorForPass.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-      toast.success('QR Code downloaded successfully!');
-    } catch (err) {
-      toast.error('Failed to download QR Code. Please try again.');
-    }
+  const handleDownloadPass = () => {
+    if (!selectedVisitorForPass?.passcode) { toast.warning('Passcodes are shown only when issued. Create a new pass if needed.'); return; }
+    const pass = selectedVisitorForPass;
+    const blobUrl = URL.createObjectURL(new Blob([`GatePass Pro Visitor Pass\nName: ${pass.name}\nFlat: ${pass.flatNo}\nPasscode: ${pass.passcode}\nValid for 24 hours from issue, one entry only.`], { type: 'text/plain' }));
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = 'visitor-pass.txt';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    toast.success('Visitor pass downloaded. Share it privately with your visitor.');
   };
 
   const handleRejectVisitor = async (visitorId) => {
@@ -619,7 +613,7 @@ export default function ResidentDashboard() {
                     </td>
                     <td style={{ padding: '14px 0', fontWeight: '600', color: 'var(--primary)' }}>{visitor.type}</td>
                     <td style={{ padding: '14px 0', textAlign: 'center', fontWeight: '700', color: 'var(--accent)' }}>
-                      <code>{visitor.passcode}</code>
+                      <code>{visitor.passcode || 'Shown at issuance'}</code>
                       {visitor.status === 'Approved' && (
                         <ExpiryCountdown createdAt={visitor.createdAt} />
                       )}
@@ -1142,11 +1136,7 @@ export default function ResidentDashboard() {
               alignItems: 'center',
               gap: '16px'
             }}>
-              <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(selectedVisitorForPass.passcode)}`}
-                alt="Visitor Pass QR Code"
-                style={{ width: '150px', height: '150px', borderRadius: '8px', border: '1px solid var(--border)' }}
-              />
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Save or download the code when it is issued. It is not retrievable after refreshing this page.</p>
               
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Visitor Name</div>
@@ -1156,7 +1146,7 @@ export default function ResidentDashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', width: '100%', gap: '12px', textAlign: 'center', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Passcode</div>
-                  <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent)' }}>{selectedVisitorForPass.passcode}</div>
+                  <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent)' }}>{selectedVisitorForPass.passcode || 'Shown only when issued'}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Flat No</div>
@@ -1166,8 +1156,8 @@ export default function ResidentDashboard() {
             </div>
             
             <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
-              <FormButton onClick={handleDownloadQr} variant="secondary" style={{ flex: 1 }}>
-                Download QR
+              <FormButton onClick={handleDownloadPass} variant="secondary" style={{ flex: 1 }}>
+                Download Pass
               </FormButton>
               <FormButton onClick={() => { setIsPassDetailOpen(false); setSelectedVisitorForPass(null); }} variant="primary" style={{ flex: 1 }}>
                 Close Pass

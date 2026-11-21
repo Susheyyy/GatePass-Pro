@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car, ChevronLeft, ChevronRight, Menu, Truck, FileText } from 'lucide-react';
 import { notificationApi, residentApi, visitorApi, getUserInfo } from '../services/api';
 import { connectSocket, disconnectSocket } from '../services/socket';
+import { endDemoSession, isDemoSession } from '../services/demo';
 
 const AVATAR_MAP = {
   avatar1: { emoji: '👤', bg: 'linear-gradient(135deg, #6366f1, #a855f7)' },
@@ -51,6 +52,13 @@ export default function Layout({ children }) {
   const location = useLocation();
   const { flatNo, role: userRole, email: residentEmail } = getUserInfo();
   const [notifications, setNotifications] = useState([]);
+  const [apiError, setApiError] = useState('');
+
+  useEffect(() => {
+    const showError = event => setApiError(event.detail);
+    window.addEventListener('gatepass_api_error', showError);
+    return () => window.removeEventListener('gatepass_api_error', showError);
+  }, []);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [distressBanners, setDistressBanners] = useState([]);
   const [avatar, setAvatar] = useState('avatar1');
@@ -60,6 +68,8 @@ export default function Layout({ children }) {
 
 
   const handleLogout = () => {
+    disconnectSocket();
+    endDemoSession();
     sessionStorage.removeItem('gatepass_token');
     navigate('/login');
   };
@@ -77,7 +87,7 @@ export default function Layout({ children }) {
     const loadAvatar = () => {
       if (userRole === 'resident') {
         residentApi.getAll().then(list => {
-          const current = list.find(r => r.email.toLowerCase() === residentEmail?.toLowerCase() || r.gmail.toLowerCase() === residentEmail?.toLowerCase());
+          const current = list.find(r => r.email?.toLowerCase() === residentEmail?.toLowerCase() || r.gmail?.toLowerCase() === residentEmail?.toLowerCase());
           if (current && current.avatar) {
             setAvatar(current.avatar);
           }
@@ -161,7 +171,19 @@ export default function Layout({ children }) {
       ];
 
   return (
-    <div className="layout-wrapper">
+    <div className="layout-wrapper" style={isDemoSession() ? { paddingBottom: '90px' } : undefined}>
+      {apiError && (
+        <div role="alert" style={{ position: 'fixed', bottom: '16px', left: '50%', transform: 'translateX(-50%)', width: 'min(92vw, 650px)', zIndex: 10001, padding: '14px', borderRadius: '10px', background: '#fff1f2', color: '#881337', boxShadow: '0 4px 20px #0002' }}>
+          {apiError}
+          <button type="button" onClick={() => setApiError('')} style={{ marginLeft: '12px', cursor: 'pointer' }}>Dismiss</button>
+        </div>
+      )}
+      {isDemoSession() && (
+        <div role="status" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10000, padding: '10px 16px', background: '#320b35', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '12px', fontSize: '0.8rem' }}>
+          <span>Demo mode · Fictional data · Changes stay in this tab · No live alerts</span>
+          <button type="button" onClick={handleLogout} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid white', background: 'transparent', color: 'white', cursor: 'pointer' }}>Exit demo / switch role</button>
+        </div>
+      )}
       {distressBanners.length > 0 && (
         <div style={{
           position: 'fixed',

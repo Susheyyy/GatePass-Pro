@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { residentApi } from '../services/api';
+import { endDemoSession, startDemoSession } from '../services/demo';
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -25,18 +26,31 @@ export default function Login() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const targetAdminEmail = "admin@gatepass.com";
-  const targetAdminPassword = "admin123";
-  const defaultResidentPassword = "resident123";
+
+  const handleDemoLogin = (role) => {
+    try {
+      navigate(startDemoSession(role));
+    } catch {
+      endDemoSession();
+      setValidationError('Unable to start the demo. Please allow browser storage and try again.');
+    }
+  };
 
   useEffect(() => {
+    endDemoSession();
     document.title = 'Login | GatePass Pro';
     const paramEmail = searchParams.get('email');
     if (paramEmail) setEmail(paramEmail);
+    if (searchParams.get('activate') === '1' && paramEmail) {
+      setResetUser({ email: paramEmail });
+      setIsResetView(true);
+    }
   }, [searchParams]);
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    endDemoSession();
+    sessionStorage.removeItem('gatepass_token');
     setIsLoading(true);
     setValidationError('');
 
@@ -69,7 +83,7 @@ export default function Login() {
 
         const matchedResident = loginRes.resident;
 
-        if (matchedResident.isFirstLogin || password === defaultResidentPassword) {
+        if (matchedResident.isFirstLogin) {
           setResetUser(matchedResident);
           setIsResetView(true);
           setIsLoading(false);
@@ -102,17 +116,14 @@ export default function Login() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setValidationError('Password must be at least 6 characters long');
+    if (new TextEncoder().encode(newPassword).length < 12 || new TextEncoder().encode(newPassword).length > 72) {
+      setValidationError('Password must contain 12 to 72 UTF-8 bytes');
       setIsLoading(false);
       return;
     }
 
     try {
-      const updatedResident = await residentApi.update(resetUser._id, {
-        password: newPassword,
-        otp: enteredOtp.trim()
-      });
+      const updatedResident = await residentApi.activate(resetUser.email, enteredOtp.trim(), newPassword);
 
       const loginRes = await residentApi.login(updatedResident.email, newPassword);
       sessionStorage.setItem('gatepass_token', loginRes.token);
@@ -150,8 +161,8 @@ export default function Login() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setValidationError('Password must be at least 6 characters long');
+    if (new TextEncoder().encode(newPassword).length < 12 || new TextEncoder().encode(newPassword).length > 72) {
+      setValidationError('Password must contain 12 to 72 UTF-8 bytes');
       setIsLoading(false);
       return;
     }
@@ -230,6 +241,35 @@ export default function Login() {
             </p>
           </div>
         </div>
+
+        {!isResetView && !isForgotView && !isForgotResetView && (
+          <section aria-label="Explore the prototype" style={{ padding: '18px', borderRadius: '14px', background: 'rgba(50, 11, 53, 0.04)', border: '1px solid var(--border)' }}>
+            <h2 style={{ fontSize: '1rem', margin: '0 0 6px' }}>Just looking around?</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 14px' }}>Try the prototype instantly. No account or password needed.</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {['admin', 'security', 'resident'].map(role => (
+                <button key={role} type="button" disabled={isLoading} onClick={() => handleDemoLogin(role)} style={{ flex: '1 1 100px', padding: '11px 8px', borderRadius: '8px', border: '1px solid var(--primary)', background: 'white', color: 'var(--primary)', cursor: 'pointer', fontWeight: 700 }}>
+                  {role === 'admin' ? 'Admin demo' : role === 'security' ? 'Guard demo' : 'Resident demo'}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '12px 0 0' }}>Fictional data. Changes stay in this tab and reset when you start a new demo. For gate entry, try A-101 / 123456.</p>
+          </section>
+        )}
+
+        {!isResetView && !isForgotView && !isForgotResetView && (
+          <button type="button" disabled={isLoading} onClick={async () => {
+            if (!email.trim()) { setValidationError('Fill in the email field, then request activation.'); return; }
+            setIsLoading(true);
+            try {
+              await residentApi.requestActivation(email.trim());
+              setResetUser({ email: email.trim() });
+              setIsResetView(true);
+              setValidationError('If your account is approved, use the activation code sent to your registered email.');
+            } catch (error) { setValidationError(error.message); }
+            finally { setIsLoading(false); }
+          }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', cursor: 'pointer', color: 'var(--primary)' }}>New resident? Activate your account</button>
+        )}
 
         {validationError && (
           <div style={{

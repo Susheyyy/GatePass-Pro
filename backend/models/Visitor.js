@@ -24,7 +24,8 @@ const visitorSchema = new mongoose.Schema({
   },
   passcode: {
     type: String,
-    required: true
+    required: true,
+    select: false
   },
   status: {
     type: String,
@@ -63,15 +64,9 @@ const visitorSchema = new mongoose.Schema({
 
 const bcrypt = require('bcryptjs');
 
-visitorSchema.pre('save', async function(next) {
-  if (!this.isModified('passcode')) return next();
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.passcode = await bcrypt.hash(this.passcode, salt);
-    next();
-  } catch (err) {
-    next(err);
-  }
+visitorSchema.pre('save', async function() {
+  if (!this.isModified('passcode')) return;
+  this.passcode = await bcrypt.hash(this.passcode, 10);
 });
 
 visitorSchema.methods.matchPasscode = async function(enteredPasscode) {

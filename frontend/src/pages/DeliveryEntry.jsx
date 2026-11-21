@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { visitorApi } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
+import IssuedPass from '../components/IssuedPass';
 
 export default function DeliveryEntry() {
   const toast = useToast();
@@ -13,6 +14,7 @@ export default function DeliveryEntry() {
     vehicleNumber: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [issuedPass, setIssuedPass] = useState(null);
 
   useEffect(() => {
     document.title = 'Delivery Entry | GatePass Pro';
@@ -36,16 +38,17 @@ export default function DeliveryEntry() {
 
     setSubmitting(true);
     try {
-      await visitorApi.create({
+      const created = await visitorApi.create({
         name: formData.name.trim(),
         type: 'Delivery',
         mobile: formData.mobile.trim(),
         flatNo: formData.flatNo.trim().toUpperCase(),
         purpose: formData.company,
         vehicleNumber: formData.vehicleNumber.trim().toUpperCase(),
-        status: 'Checked In'
+        status: 'Pending'
       });
-      toast.success('Delivery checked in successfully!');
+      setIssuedPass(created);
+      toast.success('Delivery registered. Resident approval and pass verification are required before entry.');
       setFormData({
         name: '',
         company: 'Amazon',
@@ -62,12 +65,13 @@ export default function DeliveryEntry() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px', maxWidth: '600px', margin: '0 auto' }}>
+      <IssuedPass visitor={issuedPass} onDismiss={() => setIssuedPass(null)} />
       <div>
         <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span>New Delivery Entry</span>
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '4px' }}>
-          Record and authorize incoming parcel or courier deliveries at the gate.
+          Register a delivery for resident approval. Verify its passcode on the Visitors page before entry.
         </p>
       </div>
 
@@ -119,7 +123,7 @@ export default function DeliveryEntry() {
 
           <div style={{ marginTop: '10px' }}>
             <FormButton type="submit" variant="primary" disabled={submitting} style={{ width: '100%', padding: '14px' }}>
-              <span>{submitting ? 'Checking In...' : 'Verify & Check In'}</span>
+              <span>{submitting ? 'Registering...' : 'Request Delivery Approval'}</span>
             </FormButton>
           </div>
         </form>

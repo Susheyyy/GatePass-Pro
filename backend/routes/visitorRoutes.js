@@ -29,10 +29,10 @@ router.route('/blocklist')
 router.route('/blocklist/:mobile')
   .delete(protectRoute, restrictToRoles('admin'), removeBlocklist);
 
-router.post('/verify', protectRoute, passcodeLimiter, authorizeVisitorAccess, verifyPasscode);
+router.post('/verify', protectRoute, restrictToRoles('admin', 'security'), passcodeLimiter, verifyPasscode);
 
 router.route('/:id')
   .put(protectRoute, authorizeVisitorAccess, updateVisitor)
-  .delete(protectRoute, authorizeVisitorAccess, deleteVisitor);
+  .delete(protectRoute, restrictToRoles('admin', 'resident'), authorizeVisitorAccess, deleteVisitor);
 
 module.exports = router;

@@ -16,7 +16,7 @@ GatePass Pro is a full-stack smart community security and resident management pl
 - **Emergency Distress Deck**: Residents can trigger distress alerts, sending instant audio alarms and notifications to administrators and guard stations.
 - **System Command Deck**: Admin broadcasts alerts directly to tablet guards.
 - **Community Forum**: An announcement board where residents can publish posts and comment on community discussions.
-- **Local Storage Fallback**: A fully functioning offline mode allowing check-ins, lockout logic, and data updates to work seamlessly via LocalStorage when the backend is offline.
+- **Local Storage Fallback**: Explicit demo sessions simulate operations in isolated tab-local storage. Real sessions reject network/API errors and never record gate entry locally.
 
 ### ⚝ Tech Stack
 - Frontend: React.js, Vite, Custom Vanilla CSS, Lucide Icons, Socket.io-client
@@ -81,7 +81,7 @@ GatePass-Pro/
 │   │   │   ├── Vehicles.jsx   # Vehicle owner directory and plate search interface
 │   │   │   └── Visitors.jsx   # Gate pass check-in panel and entry log lists
 │   │   ├── services/
-│   │   │   ├── api.js         # API request layer with complete LocalStorage fallback
+│   │   │   ├── api.js         # API requests with isolated demo simulation and fail-closed real sessions
 │   │   │   └── socket.js      # Socket client helper
 │   │   ├── App.css
 │   │   ├── App.jsx           # Client routes
@@ -123,6 +123,14 @@ GatePass-Pro/
 
 ### ⚝ Live Demo
 https://gate-pass-pro.vercel.app/
+
+The login page includes **Admin demo**, **Guard demo**, and **Resident demo** buttons. No credentials are required. Each starts fictional, tab-local data without contacting the backend or sending live alerts. Exit the demo to switch roles or sign in normally. Try guard entry for **A-101** with passcode **123456**.
+
+See [PRODUCT_REVIEW.md](PRODUCT_REVIEW.md) for the prioritized product readiness review. Run `npm test` in `frontend` to check demo isolation.
 <br><br>
 If you have feedback or ideas, feel free to reach out! <br>
 If you like this project, consider giving it a star!
+
+
+### Security configuration and P0 upgrade
+Read [P0_UPGRADE.md](P0_UPGRADE.md) before deployment. Use backend/.env.example as the configuration template. JWT_SECRET and MONGO_URI are mandatory; privileged accounts have no default passwords. Existing installations must rotate credentials and use the dedicated account activation/recovery flow. Run npm test in each app, and run the backend integration suite with TEST_MONGO_URI pointing to a disposable MongoDB instance.

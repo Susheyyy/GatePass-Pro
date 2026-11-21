@@ -39,14 +39,18 @@ const residentSchema = new mongoose.Schema({
     lowercase: true
   },
   otp: {
-    type: String
+    type: String,
+    select: false
   },
+  otpPurpose: { type: String, enum: ['activate', 'reset'] },
+  otpAttempts: { type: Number, default: 0 },
+  tokenVersion: { type: Number, default: 0 },
   otpExpiresAt: {
     type: Date
   },
   password: {
     type: String,
-    default: 'resident123'
+    select: false
   },
   isFirstLogin: {
     type: Boolean,

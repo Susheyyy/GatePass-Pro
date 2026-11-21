@@ -1,13 +1,18 @@
 import { io } from 'socket.io-client';
+import { isDemoSession } from './demo.js';
 
 let socket = null;
 let currentRoomInfo = null;
 
-const SOCKET_URL = import.meta.env.VITE_API_URL
+const SOCKET_URL = import.meta.env?.VITE_API_URL
   ? import.meta.env.VITE_API_URL.split('/api')[0]
   : 'http://localhost:5000';
 
 export const connectSocket = (role, flatNo) => {
+  if (isDemoSession()) {
+    disconnectSocket();
+    return null;
+  }
   const token = sessionStorage.getItem('gatepass_token');
   const roomKey = `${role}_${flatNo || ''}`;
 

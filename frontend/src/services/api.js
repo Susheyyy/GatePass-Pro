@@ -1,9 +1,16 @@
 import axios from 'axios';
+import { apiStorage, isDemoSession } from './demo.js';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/residents';
+const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000/api/residents';
 
 axios.interceptors.request.use((config) => {
+  if (isDemoSession()) {
+    // Reuse the local simulator without contacting any backend.
+    config.adapter = async () => { throw new Error('Demo simulation'); };
+    return config;
+  }
   const token = sessionStorage.getItem('gatepass_token');
+  config.timeout = config.timeout || 15000;
   if (token && token.split('.').length === 3) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
@@ -12,11 +19,21 @@ axios.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
+function requireDemoFallback(error) {
+  if (isDemoSession()) return;
+  const message = error.response?.data?.message || 'Unable to reach GatePass Pro. No local changes were saved. Please retry when connected.';
+  window.dispatchEvent(new CustomEvent('gatepass_api_error', { detail: message }));
+  throw new Error(message, { cause: error });
+}
+
 export const getUserFromToken = () => {
   const token = sessionStorage.getItem('gatepass_token');
   if (!token || token === 'true') return null;
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (!['admin', 'security', 'resident'].includes(payload.role)) return null;
+    if (isDemoSession()) return payload.demo === true ? payload : null;
+    if (token.split('.').length !== 3 || payload.demo || !Number.isFinite(payload.exp) || payload.exp * 1000 <= Date.now()) return null;
     return payload;
   } catch (e) {
     return null;
@@ -36,20 +53,20 @@ export const getUserInfo = () => {
 const DEFAULT_RESIDENTS = [];
 
 const getLocalResidents = () => {
-  const local = localStorage.getItem('gatepass_residents');
+  const local = apiStorage.getItem('gatepass_residents');
   if (!local) {
-    localStorage.setItem('gatepass_residents', JSON.stringify(DEFAULT_RESIDENTS));
+    apiStorage.setItem('gatepass_residents', JSON.stringify(DEFAULT_RESIDENTS));
     return DEFAULT_RESIDENTS;
   }
   return JSON.parse(local);
 };
 
 const saveLocalResidents = (residents) => {
-  localStorage.setItem('gatepass_residents', JSON.stringify(residents));
+  apiStorage.setItem('gatepass_residents', JSON.stringify(residents));
 };
 
 const addLocalNotification = (notification) => {
-  const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
+  const list = JSON.parse(apiStorage.getItem('gatepass_notifications') || '[]');
   const newNotif = {
     ...notification,
     _id: 'mock-notif-' + Math.random().toString(36).substr(2, 9),
@@ -57,22 +74,50 @@ const addLocalNotification = (notification) => {
     createdAt: new Date().toISOString()
   };
   list.push(newNotif);
-  localStorage.setItem('gatepass_notifications', JSON.stringify(list));
+  apiStorage.setItem('gatepass_notifications', JSON.stringify(list));
   window.dispatchEvent(new Event('mock_notification_sent'));
   return newNotif;
 };
 
 export const residentApi = {
+  requestActivation: async (email) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/request-activation`, { email });
+      return response.data;
+    } catch (error) {
+      requireDemoFallback(error);
+      throw new Error('Activation is not needed in demo mode. Choose a demo role to explore.', { cause: error });
+    }
+  },
+  activate: async (email, otp, password) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/activate`, { email, otp, password });
+      return response.data;
+    } catch (error) {
+      requireDemoFallback(error);
+      throw new Error('Activation is not needed in demo mode. Choose a demo role to explore.', { cause: error });
+    }
+  },
+  getVehicleDirectory: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/vehicle-directory`);
+      return response.data;
+    } catch (error) {
+      requireDemoFallback(error);
+      return getLocalResidents().filter(r => r.status === 'Approved').map(({ _id, name, flatNo, vehicles, mobile }) => ({ _id, name, flatNo, vehicles, mobile }));
+    }
+  },
   login: async (email, password) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/login`, { email, password });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
       if (email.trim().toLowerCase() === 'admin@gatepass.com') {
-        const storedAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
+        const storedAdminPass = apiStorage.getItem('gatepass_admin_password') || 'admin123';
         if (password === storedAdminPass) {
           const payload = btoa(JSON.stringify({ role: 'admin', email: 'admin@gatepass.com' }));
           return {
@@ -83,7 +128,7 @@ export const residentApi = {
         }
       }
       if (email.trim().toLowerCase() === 'security@gatepass.com') {
-        const storedSecurityPass = localStorage.getItem('gatepass_security_password') || 'security123';
+        const storedSecurityPass = apiStorage.getItem('gatepass_security_password') || 'security123';
         if (password === storedSecurityPass) {
           const payload = btoa(JSON.stringify({ role: 'security', email: 'security@gatepass.com' }));
           return {
@@ -119,6 +164,7 @@ export const residentApi = {
       const response = await axios.post(`${API_BASE_URL}/bulk`, { residents });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -185,6 +231,7 @@ export const residentApi = {
       });
       return response.data.residents ?? response.data;
     } catch (error) {
+      requireDemoFallback(error);
       let list = getLocalResidents();
       if (searchQuery) {
         const regex = new RegExp(searchQuery, 'i');
@@ -199,6 +246,7 @@ export const residentApi = {
       const response = await axios.get(`${API_BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -217,6 +265,7 @@ export const residentApi = {
       const created = response.data;
       return created;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -273,6 +322,7 @@ export const residentApi = {
       const response = await axios.put(`${API_BASE_URL}/${id}`, residentData);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -355,6 +405,7 @@ export const residentApi = {
       const response = await axios.delete(`${API_BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -370,6 +421,7 @@ export const residentApi = {
       const response = await axios.post(`${API_BASE_URL}/${id}/resend-otp`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -390,6 +442,7 @@ export const residentApi = {
       const response = await axios.post(`${API_BASE_URL}/forgot-password`, { email });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -410,6 +463,7 @@ export const residentApi = {
       const response = await axios.post(`${API_BASE_URL}/reset-password`, { email, otp, password });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -434,22 +488,23 @@ export const residentApi = {
       const response = await axios.put(`${API_BASE_URL}/system/change-password`, { currentPassword, newPassword });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
       const { role } = getUserInfo();
       if (role === 'admin') {
-        const currentAdminPass = localStorage.getItem('gatepass_admin_password') || 'admin123';
+        const currentAdminPass = apiStorage.getItem('gatepass_admin_password') || 'admin123';
         if (currentPassword !== currentAdminPass) {
           throw new Error('Incorrect current password.');
         }
-        localStorage.setItem('gatepass_admin_password', newPassword);
+        apiStorage.setItem('gatepass_admin_password', newPassword);
       } else if (role === 'security') {
-        const currentSecurityPass = localStorage.getItem('gatepass_security_password') || 'security123';
+        const currentSecurityPass = apiStorage.getItem('gatepass_security_password') || 'security123';
         if (currentPassword !== currentSecurityPass) {
           throw new Error('Incorrect current password.');
         }
-        localStorage.setItem('gatepass_security_password', newPassword);
+        apiStorage.setItem('gatepass_security_password', newPassword);
       }
       return { message: 'Password updated locally in offline mode' };
     }
@@ -460,6 +515,7 @@ export const residentApi = {
       const response = await axios.get(`${API_BASE_URL}/system/profile`, { params: { role } });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -490,6 +546,7 @@ export const residentApi = {
       const response = await axios.put(`${API_BASE_URL}/system/profile`, profileData);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -498,16 +555,16 @@ export const residentApi = {
   }
 };
 
-const VISITOR_API_BASE_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/residents', '/visitors') : 'http://localhost:5000/api/visitors';
+const VISITOR_API_BASE_URL = import.meta.env?.VITE_API_URL ? import.meta.env?.VITE_API_URL.replace('/residents', '/visitors') : 'http://localhost:5000/api/visitors';
 
 const getLocalVisitors = () => {
-  const local = localStorage.getItem('gatepass_visitors');
+  const local = apiStorage.getItem('gatepass_visitors');
   if (!local) return [];
   return JSON.parse(local);
 };
 
 const saveLocalVisitors = (visitors) => {
-  localStorage.setItem('gatepass_visitors', JSON.stringify(visitors));
+  apiStorage.setItem('gatepass_visitors', JSON.stringify(visitors));
 };
 
 export const visitorApi = {
@@ -516,6 +573,7 @@ export const visitorApi = {
       const response = await axios.get(VISITOR_API_BASE_URL, { params });
       return response.data.visitors ?? response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, using LocalStorage fallback for visitors:', error.message);
       let list = getLocalVisitors();
       if (params.flatNo) {
@@ -539,6 +597,7 @@ export const visitorApi = {
       const response = await axios.post(VISITOR_API_BASE_URL, visitorData);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, saving visitor to LocalStorage:', error.message);
       const list = getLocalVisitors();
       const newVisitor = {
@@ -558,6 +617,7 @@ export const visitorApi = {
       const response = await axios.put(`${VISITOR_API_BASE_URL}/${id}`, visitorData);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, updating visitor in LocalStorage:', error.message);
       const list = getLocalVisitors();
       const index = list.findIndex(v => v._id === id);
@@ -592,13 +652,14 @@ export const visitorApi = {
       const response = await axios.post(`${VISITOR_API_BASE_URL}/verify`, { flatNo, passcode });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
       console.warn('Backend offline, verifying passcode in LocalStorage:', error.message);
       
       const flatKey = flatNo.trim().toUpperCase();
-      const localLockouts = JSON.parse(localStorage.getItem('gatepass_flat_lockouts') || '{}');
+      const localLockouts = JSON.parse(apiStorage.getItem('gatepass_flat_lockouts') || '{}');
       const attempts = localLockouts[flatKey] || { count: 0, lockUntil: null };
 
       if (attempts.lockUntil && new Date(attempts.lockUntil) > new Date()) {
@@ -614,11 +675,11 @@ export const visitorApi = {
         if (attempts.count >= 3) {
           attempts.lockUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
           localLockouts[flatKey] = attempts;
-          localStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
+          apiStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
           throw new Error(`Too many invalid attempts. Flat ${flatNo} is locked out for 15 minutes.`);
         }
         localLockouts[flatKey] = attempts;
-        localStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
+        apiStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
         throw new Error(`Invalid passcode. Attempts remaining for flat: ${3 - attempts.count}`);
       }
 
@@ -626,7 +687,7 @@ export const visitorApi = {
         attempts.count = 0;
         attempts.lockUntil = null;
         localLockouts[flatKey] = attempts;
-        localStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
+        apiStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
       }
 
       const visitor = list[visitorIndex];
@@ -640,7 +701,7 @@ export const visitorApi = {
       }
 
       localLockouts[flatKey] = { count: 0, lockUntil: null };
-      localStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
+      apiStorage.setItem('gatepass_flat_lockouts', JSON.stringify(localLockouts));
 
       visitor.status = 'Checked In';
       visitor.checkedInAt = new Date().toISOString();
@@ -662,6 +723,7 @@ export const visitorApi = {
       const response = await axios.delete(`${VISITOR_API_BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, deleting visitor from LocalStorage:', error.message);
       const list = getLocalVisitors();
       const index = list.findIndex(v => v._id === id);
@@ -689,6 +751,7 @@ export const visitorApi = {
       link.click();
       link.remove();
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
@@ -712,10 +775,11 @@ export const visitorApi = {
       const response = await axios.post(`${VISITOR_API_BASE_URL}/system/lockdown`, { lockdown });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      localStorage.setItem('gatepass_lockdown_offline', lockdown ? 'true' : 'false');
+      apiStorage.setItem('gatepass_lockdown_offline', lockdown ? 'true' : 'false');
       return { lockdown };
     }
   },
@@ -724,10 +788,11 @@ export const visitorApi = {
       const response = await axios.get(`${VISITOR_API_BASE_URL}/system/lockdown`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      const isLockdown = localStorage.getItem('gatepass_lockdown_offline') === 'true';
+      const isLockdown = apiStorage.getItem('gatepass_lockdown_offline') === 'true';
       return { lockdown: isLockdown };
     }
   },
@@ -736,13 +801,14 @@ export const visitorApi = {
       const response = await axios.post(`${VISITOR_API_BASE_URL}/blocklist`, { mobile, reason });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      const list = JSON.parse(localStorage.getItem('gatepass_blocklist_offline') || '[]');
+      const list = JSON.parse(apiStorage.getItem('gatepass_blocklist_offline') || '[]');
       if (!list.some(b => b.mobile === mobile)) {
         list.push({ mobile, reason, createdAt: new Date().toISOString() });
-        localStorage.setItem('gatepass_blocklist_offline', JSON.stringify(list));
+        apiStorage.setItem('gatepass_blocklist_offline', JSON.stringify(list));
       }
       return { mobile, reason };
     }
@@ -752,10 +818,11 @@ export const visitorApi = {
       const response = await axios.get(`${VISITOR_API_BASE_URL}/blocklist`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      return JSON.parse(localStorage.getItem('gatepass_blocklist_offline') || '[]');
+      return JSON.parse(apiStorage.getItem('gatepass_blocklist_offline') || '[]');
     }
   },
   removeBlocklist: async (mobile) => {
@@ -763,27 +830,28 @@ export const visitorApi = {
       const response = await axios.delete(`${VISITOR_API_BASE_URL}/blocklist/${mobile}`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       if (error.response) {
         throw new Error(error.response.data.message || 'Server error');
       }
-      let list = JSON.parse(localStorage.getItem('gatepass_blocklist_offline') || '[]');
+      let list = JSON.parse(apiStorage.getItem('gatepass_blocklist_offline') || '[]');
       list = list.filter(b => b.mobile !== mobile);
-      localStorage.setItem('gatepass_blocklist_offline', JSON.stringify(list));
+      apiStorage.setItem('gatepass_blocklist_offline', JSON.stringify(list));
       return { message: 'Mobile number removed from blocklist.' };
     }
   }
 };
 
-const POST_API_BASE_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/residents', '/posts') : 'http://localhost:5000/api/posts';
+const POST_API_BASE_URL = import.meta.env?.VITE_API_URL ? import.meta.env?.VITE_API_URL.replace('/residents', '/posts') : 'http://localhost:5000/api/posts';
 
 const getLocalPosts = () => {
-  const local = localStorage.getItem('gatepass_posts');
+  const local = apiStorage.getItem('gatepass_posts');
   if (!local) return [];
   return JSON.parse(local);
 };
 
 const saveLocalPosts = (posts) => {
-  localStorage.setItem('gatepass_posts', JSON.stringify(posts));
+  apiStorage.setItem('gatepass_posts', JSON.stringify(posts));
 };
 
 export const postApi = {
@@ -792,6 +860,7 @@ export const postApi = {
       const response = await axios.get(POST_API_BASE_URL);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, using LocalStorage fallback for posts:', error.message);
       return getLocalPosts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
@@ -801,6 +870,7 @@ export const postApi = {
       const response = await axios.post(POST_API_BASE_URL, { title, description, category });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, saving post to LocalStorage:', error.message);
       const list = getLocalPosts();
       let authorName = 'System Admin';
@@ -839,6 +909,7 @@ export const postApi = {
       const response = await axios.post(`${POST_API_BASE_URL}/${id}/comments`, { text });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, adding comment in LocalStorage:', error.message);
       const list = getLocalPosts();
       const index = list.findIndex(p => p._id === id);
@@ -883,6 +954,7 @@ export const postApi = {
       const response = await axios.delete(`${POST_API_BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, deleting post locally:', error.message);
       const list = getLocalPosts();
       const filtered = list.filter(p => p._id !== id);
@@ -892,7 +964,7 @@ export const postApi = {
   }
 };
 
-const NOTIF_API_BASE_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/residents', '/notifications') : 'http://localhost:5000/api/notifications';
+const NOTIF_API_BASE_URL = import.meta.env?.VITE_API_URL ? import.meta.env?.VITE_API_URL.replace('/residents', '/notifications') : 'http://localhost:5000/api/notifications';
 
 export const notificationApi = {
   getAll: async (role, flatNo) => {
@@ -902,8 +974,9 @@ export const notificationApi = {
       });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, using LocalStorage fallback for notifications:', error.message);
-      const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
+      const list = JSON.parse(apiStorage.getItem('gatepass_notifications') || '[]');
       const recipientValue = role === 'admin' ? 'admin' : flatNo;
       return list.filter(n => n.recipient === 'all' || n.recipient === recipientValue)
                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -914,12 +987,13 @@ export const notificationApi = {
       const response = await axios.put(`${NOTIF_API_BASE_URL}/${id}/read`);
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, marking notification read in LocalStorage:', error.message);
-      const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
+      const list = JSON.parse(apiStorage.getItem('gatepass_notifications') || '[]');
       const index = list.findIndex(n => n._id === id);
       if (index !== -1) {
         list[index].isRead = true;
-        localStorage.setItem('gatepass_notifications', JSON.stringify(list));
+        apiStorage.setItem('gatepass_notifications', JSON.stringify(list));
         return list[index];
       }
       throw new Error('Notification not found');
@@ -932,8 +1006,9 @@ export const notificationApi = {
       });
       return { message: 'Notifications cleared successfully' };
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, clearing notifications in LocalStorage:', error.message);
-      const list = JSON.parse(localStorage.getItem('gatepass_notifications') || '[]');
+      const list = JSON.parse(apiStorage.getItem('gatepass_notifications') || '[]');
       const filtered = list.filter(n => {
         if (role === 'admin') {
           return n.recipient !== 'admin';
@@ -941,7 +1016,7 @@ export const notificationApi = {
           return n.recipient !== flatNo;
         }
       });
-      localStorage.setItem('gatepass_notifications', JSON.stringify(filtered));
+      apiStorage.setItem('gatepass_notifications', JSON.stringify(filtered));
       return { message: 'Notifications cleared successfully' };
     }
   },
@@ -955,6 +1030,7 @@ export const notificationApi = {
       });
       return response.data;
     } catch (error) {
+      requireDemoFallback(error);
       console.warn('Backend offline, broadcasting in LocalStorage:', error.message);
       return addLocalNotification({
         recipient: 'all',

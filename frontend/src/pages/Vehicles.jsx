@@ -29,7 +29,7 @@ export default function Vehicles() {
   const fetchDirectory = async () => {
     try {
       setLoading(true);
-      const list = await residentApi.getAll();
+      const list = await residentApi.getVehicleDirectory();
       setResidents(list);
       const visitorList = await visitorApi.getAll();
       setVisitors(visitorList);
@@ -87,7 +87,7 @@ export default function Vehicles() {
       setMyResidentProfile(updated);
       setNewVehicleNumber('');
       toast.success(`Vehicle ${cleanVehicleNumber} registered successfully!`);
-      const list = await residentApi.getAll();
+      const list = await residentApi.getVehicleDirectory();
       setResidents(list);
     } catch (err) {
       toast.error('Failed to register vehicle.');
@@ -114,7 +114,7 @@ export default function Vehicles() {
       toast.success(`Vehicle ${vehicleToDelete} removed successfully.`);
       setIsDeleteOpen(false);
       setVehicleToDelete('');
-      const list = await residentApi.getAll();
+      const list = await residentApi.getVehicleDirectory();
       setResidents(list);
     } catch (err) {
       toast.error('Failed to remove vehicle.');
@@ -388,7 +388,7 @@ export default function Vehicles() {
                       </td>
 
                       <td style={{ padding: '16px 0' }}>
-                        <a href={`tel:${entry.mobile}`} style={{
+                        {entry.mobile ? <a href={`tel:${entry.mobile}`} style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '8px',
@@ -414,7 +414,7 @@ export default function Vehicles() {
                         >
                           <Phone size={14} />
                           <span>{entry.mobile}</span>
-                        </a>
+                        </a> : <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Contact gate staff</span>}
                       </td>
                     </tr>
                   );

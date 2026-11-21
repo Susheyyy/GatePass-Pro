@@ -1,164 +1,81 @@
+const { randomBytes } = require('node:crypto');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const Resident = require('../models/Resident');
-const { sendEmail } = require('../config/mailer');
+const SystemCredential = require('../models/SystemCredential');
+const SystemProfile = require('../models/SystemProfile');
+const Notification = require('../models/Notification');
+const { jwtSecret, validPassword, publicResident, residentFields } = require('../config/security');
+const { sendChallenge } = require('./passwordController');
+const { authenticate } = require('../middleware/authMiddleware');
+
+const pageOptions = query => ({ page: Math.max(1, Number.parseInt(query.page) || 1), limit: Math.min(200, Math.max(1, Number.parseInt(query.limit) || 50)) });
+const escaped = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const getResidents = async (req, res) => {
   try {
-    const { search, page = 1, limit = 50 } = req.query;
-    let query = {};
-
-    if (search) {
-      const searchRegex = new RegExp(search, 'i');
-      query.$or = [
-        { name: searchRegex },
-        { flatNo: searchRegex },
-        { vehicles: searchRegex }
-      ];
+    const query = req.user.role === 'resident' ? { flatNo: req.user.flatNo } : {};
+    if (req.query.search) {
+      const search = new RegExp(escaped(req.query.search), 'i');
+      query.$or = [{ name: search }, { flatNo: search }, { vehicles: search }];
     }
-
-    const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
-    const skip = (pageNum - 1) * limitNum;
+    const { page, limit } = pageOptions(req.query);
     const [residents, total] = await Promise.all([
-      Resident.find(query).select('-password').sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+      Resident.find(query).select(residentFields).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
       Resident.countDocuments(query)
     ]);
-    res.status(200).json({
-      residents,
-      total,
-      page: pageNum,
-      pages: Math.ceil(total / limitNum)
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    // Co-residents get household identity, not another member's profile/contact details.
+    const result = residents.map(r => req.user.role === 'resident' && String(r._id) !== String(req.user.residentId)
+      ? { _id: r._id, name: r.name, flatNo: r.flatNo, status: r.status, vehicles: r.vehicles }
+      : publicResident(r));
+    res.json({ residents: result, total, page, pages: Math.ceil(total / limit) });
+  } catch {
+    res.status(500).json({ message: 'Unable to load residents' });
   }
 };
 
+const getVehicleDirectory = async (req, res) => {
+  try {
+    const projection = req.user.role === 'resident' ? '_id name flatNo vehicles' : '_id name flatNo vehicles mobile';
+    const residents = await Resident.find({ status: 'Approved', 'vehicles.0': { $exists: true } }).select(projection).limit(1000);
+    res.json(residents);
+  } catch {
+    res.status(500).json({ message: 'Unable to load vehicle directory' });
+  }
+};
+
+function registrationData(body) {
+  const { name, mobile, gmail, members } = body;
+  if (typeof body.flatNo !== 'string' || !/^[A-Z]+-\d+$/.test(body.flatNo.trim().toUpperCase()) || typeof name !== 'string' || name.trim().length < 2 || name.length > 80 || typeof mobile !== 'string' || !/^\d{8,15}$/.test(mobile) || typeof gmail !== 'string' || gmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gmail) || !Number.isInteger(Number(members)) || Number(members) < 1 || Number(members) > 50) throw new Error('Provide a valid flat, name, mobile, email and household size (1-50)');
+  return { flatNo: body.flatNo.trim().toUpperCase(), name: name.trim(), mobile, gmail: gmail.trim().toLowerCase(), members: Number(members) };
+}
+
+async function createResident(data, approved) {
+  if (await Resident.exists({ gmail: data.gmail })) throw new Error('A resident with this email already exists');
+  const email = `${data.name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '')}.${data.flatNo.toLowerCase().replace('-', '')}.${randomBytes(3).toString('hex')}@gatepass.com`;
+  const resident = await Resident.create({ ...data, email, password: randomBytes(32).toString('hex'), status: approved ? 'Approved' : 'Pending', isFirstLogin: true, communityId: randomBytes(10).toString('hex'), address: `Flat ${data.flatNo}, GatePass Residency` });
+  if (approved) {
+    try { await sendChallenge(resident, 'activate'); } catch { /* Admin can resend after mail configuration is corrected. */ }
+  }
+  return resident;
+}
+
 const addResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, gmail, members, isSelfRegistration, isResidentAdding } = req.body;
-    
-    if (!flatNo || !name || !mobile || !gmail || !members) {
-      return res.status(400).json({ message: 'All fields are required' });
+    const data = registrationData(req.body);
+    let coResident = false;
+    if (req.body.isResidentAdding) {
+      let user;
+      try { user = await authenticate((req.headers.authorization || '').replace(/^Bearer /, '')); }
+      catch { return res.status(401).json({ message: 'Authentication required to add household members' }); }
+      if (user.role !== 'resident' || user.flatNo !== data.flatNo) return res.status(403).json({ message: 'You can only add members to your own flat' });
+      coResident = true;
     }
-
-    if (!/^[a-zA-Z]+-\d+$/.test(flatNo.trim())) {
-      return res.status(400).json({ message: 'Flat Number must be in Alphabet-number format (e.g. A-102)' });
-    }
-    if (!/^\d+$/.test(mobile.trim())) {
-      return res.status(400).json({ message: 'Mobile Number must contain only digits' });
-    }
-    if (!/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(gmail.trim())) {
-      return res.status(400).json({ message: 'Gmail Address must end with a standard provider (e.g. @gmail.com, @yahoo.com)' });
-    }
-    if (!/^\d+$/.test(members.toString().trim())) {
-      return res.status(400).json({ message: 'Total Family Members must contain only digits' });
-    }
-
-    if (isResidentAdding) {
-      const authHeader = req.headers['authorization'];
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authentication required to add co-residents' });
-      }
-      const token = authHeader.split(' ')[1];
-      const jwt = require('jsonwebtoken');
-      const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
-      let decoded;
-      try {
-        decoded = jwt.verify(token, jwtSecret);
-      } catch (err) {
-        return res.status(401).json({ message: 'Invalid or expired token' });
-      }
-      if (decoded.role !== 'resident') {
-        return res.status(403).json({ message: 'Forbidden: Only residents can add co-residents' });
-      }
-      if (decoded.flatNo !== flatNo) {
-        return res.status(403).json({ message: 'Forbidden: You can only add co-residents to your own flat' });
-      }
-    }
-
-    const formattedGmail = gmail.trim().toLowerCase();
-    const existingGmail = await Resident.findOne({ gmail: formattedGmail });
-    if (existingGmail) {
-      return res.status(400).json({ message: 'A resident with this Gmail address already exists' });
-    }
-
-    if (!isSelfRegistration && !isResidentAdding) {
-      const existingFlat = await Resident.findOne({ flatNo });
-      if (existingFlat) {
-        return res.status(400).json({ message: 'A resident is already registered for this flat. Additional residents must register themselves or be added by the flat owner.' });
-      }
-    }
-    
-    const firstName = name.trim().split(' ')[0].toLowerCase();
-    const flatClean = flatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
-    let generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
-    let emailExists = await Resident.findOne({ email: generatedEmail });
-    let counter = 1;
-    while (emailExists) {
-      generatedEmail = `${firstName}.${flatClean}${counter}@gatepass.com`;
-      emailExists = await Resident.findOne({ email: generatedEmail });
-      counter++;
-    }
-    
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const generatedCommunityId = Math.floor(10000 + Math.random() * 90000).toString();
-    
-    const resident = await Resident.create({
-      flatNo,
-      name,
-      mobile,
-      email: generatedEmail,
-      gmail,
-      members,
-      otp: generatedOtp,
-      otpExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      password: 'resident123',
-      isFirstLogin: true,
-      communityId: generatedCommunityId,
-      status: isResidentAdding ? 'Approved' : 'Pending',
-      address: `Flat ${flatNo}, GatePass Residency`
-    });
-
+    const resident = await createResident(data, coResident);
     try {
-      const Notification = require('../models/Notification');
-      await Notification.create({
-        recipient: 'admin',
-        title: 'New Resident Registration',
-        message: `${name} requested registration for Flat ${flatNo}. Approval required.`,
-        type: 'admin_broadcast'
-      });
-    } catch (notifErr) {
-    }
-    
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    
-    if (isResidentAdding) {
-      const link = `${frontendUrl}/login?email=${generatedEmail}&otp=${generatedOtp}`;
-      console.log(`\n=================== REGISTRATION APPROVED EMAIL PENDING SEND ===================\nTo: ${gmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n================================================================================\n`);
-      sendEmail({
-        to: gmail,
-        subject: 'GatePass Pro - Resident Account Created',
-        text: `Hello ${name},\n\nYour resident account has been created by the flat owner.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}\n\nUpon first login, you will be required to change your password using the OTP.`
-      })
-        .catch((mailError) => {
-          console.log(`[Email Workaround] Welcome email failed to send to ${gmail}. Credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
-        });
-    } else {
-      console.log(`\n=================== REGISTRATION RECEIVED EMAIL PENDING SEND ===================\nTo: ${gmail}\nRegistration pending admin approval.\n================================================================================\n`);
-      sendEmail({
-        to: gmail,
-        subject: 'GatePass Pro - Registration Received',
-        text: `Hello ${name},\n\nYour resident account registration request for Flat ${flatNo} has been received and is currently pending administrator approval.\n\nOnce approved, you will receive a follow-up email with your login credentials and verification code.`
-      })
-        .catch((mailError) => {
-          console.log(`[Email Workaround] Registration received email failed to send to ${gmail}`);
-        });
-    }
-    
-    const responseObj = resident.toObject();
-    delete responseObj.otp;
-    delete responseObj.password;
-    res.status(201).json(responseObj);
+      await Notification.create({ recipient: 'admin', title: 'Resident registration', message: `${resident.name} registered for ${resident.flatNo}.`, type: 'admin_broadcast' });
+    } catch { console.error('Registration notification persistence failed'); }
+    res.status(201).json(publicResident(resident));
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -166,636 +83,142 @@ const addResident = async (req, res) => {
 
 const updateResident = async (req, res) => {
   try {
-    const { flatNo, name, mobile, gmail, members, status, password, otp, distressMessage, sender, bio, location, address, clearDistress, currentPassword, newPassword, distressStatus, vehicles, avatar } = req.body;
-    const resident = await Resident.findById(req.params.id);
-    
-    if (!resident) {
-      return res.status(404).json({ message: 'Resident not found' });
+    const body = req.body;
+    if (body.password !== undefined || body.otp !== undefined) return res.status(400).json({ message: 'Use the dedicated activation or password reset endpoint' });
+    const resident = await Resident.findById(req.params.id).select('+password');
+    if (!resident) return res.status(404).json({ message: 'Resident not found' });
+    if (req.user.role !== 'admin' && ((body.flatNo !== undefined && body.flatNo !== resident.flatNo) || (body.status !== undefined && body.status !== resident.status))) return res.status(403).json({ message: 'Only administrators can change flat assignment or approval status' });
+    if (body.currentPassword !== undefined || body.newPassword !== undefined) {
+      if (typeof body.currentPassword !== 'string' || !validPassword(body.newPassword)) return res.status(400).json({ message: 'New password must contain 12 to 72 UTF-8 bytes' });
+      if (!resident.password || !await bcrypt.compare(body.currentPassword, resident.password)) return res.status(400).json({ message: 'Incorrect current password' });
+      // Atomic update also invalidates outstanding reset challenges and all sessions.
+      const updated = await Resident.findOneAndUpdate({ _id: resident._id, password: resident.password }, { $set: { password: await bcrypt.hash(body.newPassword, 12) }, $inc: { tokenVersion: 1 }, $unset: { otp: 1, otpPurpose: 1, otpExpiresAt: 1 } }, { returnDocument: 'after' });
+      if (!updated) return res.status(409).json({ message: 'Password changed concurrently. Please sign in again.' });
+      return res.json(publicResident(updated));
     }
-    
-    if (currentPassword && newPassword) {
-      const bcrypt = require('bcryptjs');
-      const isMatch = await bcrypt.compare(currentPassword, resident.password);
-      if (!isMatch) {
-        return res.status(400).json({ message: 'Incorrect current password' });
-      }
-      resident.password = newPassword;
-      resident.isFirstLogin = false;
-    } else if (password && otp) {
-      if (resident.otp !== otp) {
-        return res.status(400).json({ message: 'Invalid verification OTP' });
-      }
-      if (resident.otpExpiresAt && resident.otpExpiresAt < new Date()) {
-        return res.status(400).json({ message: 'Verification OTP has expired. Please request a new one.' });
-      }
-      resident.password = password;
-      resident.isFirstLogin = false;
-      resident.otp = '';
-      resident.otpExpiresAt = null;
-    } else {
-      if (flatNo && !/^[a-zA-Z]+-\d+$/.test(flatNo.trim())) {
-        return res.status(400).json({ message: 'Flat Number must be in Alphabet-number format (e.g. A-102)' });
-      }
-      if (mobile && !/^\d+$/.test(mobile.trim())) {
-        return res.status(400).json({ message: 'Mobile Number must contain only digits' });
-      }
-      if (gmail && !/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(gmail.trim())) {
-        return res.status(400).json({ message: 'Gmail Address must end with a standard provider (e.g. @gmail.com, @yahoo.com)' });
-      }
-      if (members !== undefined && !/^\d+$/.test(members.toString().trim())) {
-        return res.status(400).json({ message: 'Total Family Members must contain only digits' });
-      }
-
-      resident.flatNo = flatNo || resident.flatNo;
-      resident.name = name || resident.name;
-      resident.mobile = mobile || resident.mobile;
-      if (gmail) {
-        const formattedGmail = gmail.trim().toLowerCase();
-        if (formattedGmail !== resident.gmail.trim().toLowerCase()) {
-          const existingGmail = await Resident.findOne({ gmail: formattedGmail });
-          if (existingGmail) {
-            return res.status(400).json({ message: 'A resident with this Gmail address already exists' });
-          }
-        }
-        resident.gmail = formattedGmail;
-      }
-      resident.members = members !== undefined ? (parseInt(members) || resident.members) : resident.members;
-      const wasPending = resident.status === 'Pending';
-      if (status && status !== resident.status) {
-        if (!req.user || req.user.role !== 'admin') {
-          return res.status(403).json({ message: 'Forbidden: Only administrators can update resident status' });
-        }
-        resident.status = status;
-      }
-      
-      if (status === 'Approved' && wasPending) {
-        const freshOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        resident.otp = freshOtp;
-        resident.otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); 
-        
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const link = `${frontendUrl}/login?email=${resident.email}&otp=${freshOtp}`;
-        
-        console.log(`\n=================== APPROVAL EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${freshOtp}\nLogin Link: ${link}\n=======================================================================\n`);
-        sendEmail({
-          to: resident.gmail,
-          subject: 'GatePass Pro - Resident Account Approved',
-          text: `Hello ${resident.name},\n\nYour resident account registration request has been approved.\n\nUsername: ${resident.email}\nDefault Password: resident123\nVerification OTP: ${freshOtp}\n\nPlease click the link below to verify and sign in:\n${link}`
-        })
-          .catch((mailError) => {
-            console.log(`[Email Workaround] Retrievable credentials: User=${resident.email}, OTP=${resident.otp}, Link=${link}`);
-          });
-      }
-      resident.bio = bio !== undefined ? bio : resident.bio;
-      resident.location = location !== undefined ? location : resident.location;
-      resident.address = address !== undefined ? address : resident.address;
-      resident.vehicles = vehicles !== undefined ? vehicles : resident.vehicles;
-      resident.avatar = avatar !== undefined ? avatar : resident.avatar;
-      if (distressStatus && distressStatus !== resident.distressStatus) {
-        resident.distressStatus = distressStatus;
-        if (distressStatus === 'Resolved' || distressStatus === 'Dismissed') {
-          if (req.io) {
-            req.io.to('room_admins').emit('distress_resolved', { residentId: resident._id });
-          }
-          try {
-            const Notification = require('../models/Notification');
-            const newNotif = await Notification.create({
-              recipient: resident.flatNo,
-              title: `Distress Alert ${distressStatus}`,
-              message: `Your distress alert has been marked as ${distressStatus.toLowerCase()} by the administrator.`,
-              type: 'distress_reply'
-            });
-            if (req.io) {
-              req.io.to(`room_flat_${resident.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
-            }
-          } catch (notifErr) {}
-        }
-      }
-      if (clearDistress) {
-        resident.distressMessages = [];
-        resident.distressStatus = 'None';
-        if (req.io) {
-          req.io.to('room_admins').emit('distress_resolved', { residentId: resident._id });
-        }
-      }
-      if (distressMessage) {
-        const msgSender = sender || 'resident';
-        resident.distressMessages.push({
-          message: distressMessage,
-          sender: msgSender
-        });
-        if (msgSender !== 'admin') {
-          resident.distressStatus = 'Active';
-          if (req.io) {
-            req.io.to('room_admins').emit('distress_alert', {
-              residentId: resident._id,
-              flatNo: resident.flatNo,
-              name: resident.name,
-              distressStatus: 'Active',
-              messages: resident.distressMessages
-            });
-          }
-        }
-        try {
-          const Notification = require('../models/Notification');
-          if (msgSender === 'admin') {
-            const newNotif = await Notification.create({
-              recipient: resident.flatNo,
-              title: 'New Distress Response',
-              message: `Admin replied: "${distressMessage.length > 50 ? distressMessage.substring(0, 50) + '...' : distressMessage}"`,
-              type: 'distress_reply'
-            });
-            if (req.io) {
-              req.io.to(`room_flat_${resident.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
-            }
-          } else {
-            const newNotif = await Notification.create({
-              recipient: 'admin',
-              title: 'Distress Alert Received',
-              message: `${resident.name} (Flat ${resident.flatNo}) distress: "${distressMessage.length > 50 ? distressMessage.substring(0, 50) + '...' : distressMessage}"`,
-              type: 'distress_reply'
-            });
-            if (req.io) {
-              req.io.to('room_admins').emit('new_notification', newNotif);
-            }
-          }
-        } catch (err) {
-          console.error('Error creating distress notification:', err);
-        }
-      }
+    const wasPending = resident.status !== 'Approved';
+    if (body.flatNo !== undefined) {
+      if (typeof body.flatNo !== 'string' || !/^[A-Z]+-\d+$/.test(body.flatNo.trim().toUpperCase())) return res.status(400).json({ message: 'Invalid flat number' });
+      resident.flatNo = body.flatNo.trim().toUpperCase();
     }
-    
-    const updatedResident = await resident.save();
-    res.status(200).json(updatedResident);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+    for (const key of ['name', 'mobile', 'gmail', 'members', 'bio', 'location', 'address', 'avatar', 'vehicles']) if (body[key] !== undefined) resident[key] = body[key];
+    if (body.status !== undefined) resident.status = body.status;
+    if (body.distressStatus !== undefined) {
+      if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only administrators can resolve alerts' });
+      resident.distressStatus = body.distressStatus;
+    }
+    if (body.clearDistress) {
+      resident.distressMessages = [];
+      resident.distressStatus = 'None';
+    }
+    if (body.distressMessage) {
+      if (typeof body.distressMessage !== 'string' || body.distressMessage.length > 1000) return res.status(400).json({ message: 'Alert message must be at most 1000 characters' });
+      const sender = req.user.role === 'admin' ? 'admin' : 'resident';
+      resident.distressMessages.push({ message: body.distressMessage, sender });
+      if (sender === 'resident') resident.distressStatus = 'Active';
+      const notification = await Notification.create({ recipient: sender === 'admin' ? resident.flatNo : 'admin', title: sender === 'admin' ? 'New Distress Response' : 'Distress Alert Received', message: body.distressMessage, type: 'distress_reply' });
+      req.io?.to(sender === 'admin' ? `room_flat_${resident.flatNo}` : 'room_admins').emit('new_notification', notification);
+    }
+    await resident.save();
+    if (resident.status === 'Approved' && wasPending && resident.isFirstLogin) {
+      try { await sendChallenge(resident, 'activate'); } catch { /* Resend is available to administrators. */ }
+    }
+    if (resident.distressStatus === 'Active') req.io?.to('room_admins').emit('distress_alert', { residentId: resident._id, flatNo: resident.flatNo, name: resident.name, distressStatus: resident.distressStatus, messages: resident.distressMessages });
+    else req.io?.to('room_admins').emit('distress_resolved', { residentId: resident._id });
+    res.json(publicResident(resident));
+  } catch {
+    res.status(400).json({ message: 'Unable to update resident. Check the supplied fields.' });
   }
 };
 
 const deleteResident = async (req, res) => {
   try {
-    const resident = await Resident.findById(req.params.id);
-    
-    if (!resident) {
-      return res.status(404).json({ message: 'Resident not found' });
-    }
-    
-    await resident.deleteOne();
-    res.status(200).json({ message: 'Resident removed successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const resident = await Resident.findByIdAndDelete(req.params.id);
+    if (!resident) return res.status(404).json({ message: 'Resident not found' });
+    res.json({ message: 'Resident removed successfully' });
+  } catch { res.status(400).json({ message: 'Invalid resident identifier' }); }
 };
 
 const resendOtp = async (req, res) => {
   try {
     const resident = await Resident.findById(req.params.id);
-    if (!resident) {
-      return res.status(404).json({ message: 'Resident not found' });
-    }
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    resident.otp = generatedOtp;
-    resident.otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    await resident.save();
-
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const link = `${frontendUrl}/login?email=${resident.email}`;
-    
-    
-
-    console.log(`\n=================== RESEND OTP EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nNew OTP: ${generatedOtp}\nLogin Link: ${link}\n======================================================================\n`);
-    sendEmail({
-      to: resident.gmail,
-      subject: 'GatePass Pro - New Verification OTP',
-      text: `Hello ${resident.name},\n\nYour new verification OTP has been generated.\n\nUsername: ${resident.email}\nDefault Password: resident123\nNew Verification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
-    })
-      .catch((mailError) => {
-        console.log(`[Email Workaround] Retrievable credentials: User=${resident.email}, New OTP=${generatedOtp}, Link=${link}`);
-      });
-
-    res.status(200).json({ message: 'New OTP sent successfully' });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
-const forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: 'Email address is required' });
-    }
-    const formattedEmail = email.trim().toLowerCase();
-    const resident = await Resident.findOne({
-      $or: [
-        { email: formattedEmail },
-        { gmail: formattedEmail }
-      ]
-    });
-    if (!resident) {
-      return res.status(404).json({ message: 'Resident not found with this email' });
-    }
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    resident.otp = generatedOtp;
-    resident.otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    await resident.save();
-
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const link = `${frontendUrl}/login?email=${resident.email}`;
-
-    
-
-    console.log(`\n=================== FORGOT PASSWORD EMAIL PENDING SEND ===================\nTo: ${resident.gmail}\nUsername: ${resident.email}\nReset OTP: ${generatedOtp}\nReset Link: ${link}\n=========================================================================\n`);
-    sendEmail({
-      to: resident.gmail,
-      subject: 'GatePass Pro - Password Reset OTP',
-      text: `Hello ${resident.name},\n\nWe received a request to reset your password.\n\nUsername: ${resident.email}\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to verify and choose a new password:\n${link}`
-    })
-      .catch((mailError) => {
-        console.log(`[Email Workaround] Retrievable credentials: User=${resident.email}, OTP=${generatedOtp}, Link=${link}`);
-      });
-
-    res.status(200).json({ message: 'Verification OTP sent to your registered Gmail address' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const resetForgotPassword = async (req, res) => {
-  try {
-    const { email, otp, password } = req.body;
-    if (!email || !otp || !password) {
-      return res.status(400).json({ message: 'All fields (email, otp, new password) are required' });
-    }
-    const formattedEmail = email.trim().toLowerCase();
-    const resident = await Resident.findOne({
-      $or: [
-        { email: formattedEmail },
-        { gmail: formattedEmail }
-      ]
-    });
-    if (!resident) {
-      return res.status(404).json({ message: 'Resident not found' });
-    }
-    if (resident.otp !== otp.trim()) {
-      return res.status(400).json({ message: 'Invalid verification OTP' });
-    }
-    if (resident.otpExpiresAt && resident.otpExpiresAt < new Date()) {
-      return res.status(400).json({ message: 'Verification OTP has expired. Please request a new one.' });
-    }
-    resident.password = password;
-    resident.isFirstLogin = false;
-    resident.otp = '';
-    resident.otpExpiresAt = null;
-    await resident.save();
-    res.status(200).json(resident);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    if (!resident || resident.status !== 'Approved' || !resident.isFirstLogin) return res.status(400).json({ message: 'No pending activation for this account' });
+    await sendChallenge(resident, 'activate');
+    res.json({ message: 'Activation requested. An existing unexpired code remains valid.' });
+  } catch { res.status(503).json({ message: 'Unable to deliver verification email' }); }
 };
 
 const loginResident = async (req, res) => {
+  const { email, password } = req.body;
+  if (typeof email !== 'string' || typeof password !== 'string' || email.length > 254 || Buffer.byteLength(password) > 72) return res.status(400).json({ message: 'Email and password are required' });
+  const formattedEmail = email.trim().toLowerCase();
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+    const role = formattedEmail === 'admin@gatepass.com' ? 'admin' : formattedEmail === 'security@gatepass.com' ? 'security' : 'resident';
+    if (role !== 'resident') {
+      const credential = await SystemCredential.findOne({ role });
+      // Previously seeded defaults cannot be used after this upgrade.
+      if (['admin123', 'security123'].includes(password) || !credential || !await bcrypt.compare(password, credential.password)) return res.status(401).json({ message: 'Invalid email or password' });
+      const token = jwt.sign({ role, email: formattedEmail, tokenVersion: credential.tokenVersion || 0 }, jwtSecret(), { algorithm: 'HS256', expiresIn: '8h' });
+      return res.json({ token, role, email: formattedEmail });
     }
-    
-    const formattedEmail = email.trim().toLowerCase();
-    const jwt = require('jsonwebtoken');
-    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
-
-    if (formattedEmail === 'admin@gatepass.com') {
-      const SystemCredential = require('../models/SystemCredential');
-      let adminCred = await SystemCredential.findOne({ role: 'admin' });
-      let isMatch = false;
-      if (adminCred) {
-        const bcrypt = require('bcryptjs');
-        isMatch = await bcrypt.compare(password, adminCred.password);
-      } else {
-        isMatch = (password === (process.env.ADMIN_PASSWORD || 'admin123'));
-      }
-      if (!isMatch) {
-        return res.status(400).json({ message: 'Invalid password' });
-      }
-      const token = jwt.sign({ role: 'admin', email: formattedEmail }, jwtSecret, { expiresIn: '1d' });
-      return res.status(200).json({
-        message: 'Login successful',
-        token,
-        role: 'admin',
-        email: formattedEmail
-      });
-    }
-
-    if (formattedEmail === 'security@gatepass.com') {
-      const SystemCredential = require('../models/SystemCredential');
-      let securityCred = await SystemCredential.findOne({ role: 'security' });
-      let isMatch = false;
-      if (securityCred) {
-        const bcrypt = require('bcryptjs');
-        isMatch = await bcrypt.compare(password, securityCred.password);
-      } else {
-        isMatch = (password === (process.env.SECURITY_PASSWORD || 'security123'));
-      }
-      if (!isMatch) {
-        return res.status(400).json({ message: 'Invalid password' });
-      }
-      const token = jwt.sign({ role: 'security', email: formattedEmail }, jwtSecret, { expiresIn: '1d' });
-      return res.status(200).json({
-        message: 'Login successful',
-        token,
-        role: 'security',
-        email: formattedEmail
-      });
-    }
-
-    const resident = await Resident.findOne({
-      $or: [
-        { email: formattedEmail },
-        { gmail: formattedEmail }
-      ]
-    });
-
-    if (!resident) {
-      return res.status(404).json({ message: 'Resident not found' });
-    }
-
-    if (resident.status === 'Pending') {
-      return res.status(400).json({ message: 'Your account is pending administrator approval.' });
-    }
-    if (resident.status === 'Rejected') {
-      return res.status(400).json({ message: 'Your registration request has been rejected.' });
-    }
-
-    const bcrypt = require('bcryptjs');
-    const isMatch = await bcrypt.compare(password, resident.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid password' });
-    }
-
-    const token = jwt.sign(
-      { role: 'resident', email: resident.email, residentId: resident._id, flatNo: resident.flatNo },
-      jwtSecret,
-      { expiresIn: '1d' }
-    );
-
-    const responseObj = resident.toObject();
-    delete responseObj.password;
-
-    res.status(200).json({
-      message: 'Login successful',
-      token,
-      role: 'resident',
-      resident: responseObj
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const sanitizeFormula = (val) => {
-  if (typeof val === 'string') {
-    const clean = val.trim();
-    if (/^[=+\-@]/.test(clean)) {
-      return `'` + clean;
-    }
-    return clean;
-  }
-  return val;
+    const resident = await Resident.findOne({ $or: [{ email: formattedEmail }, { gmail: formattedEmail }] }).select('+password');
+    if (!resident || resident.status !== 'Approved' || resident.isFirstLogin || !resident.password || !await bcrypt.compare(password, resident.password)) return res.status(401).json({ message: 'Invalid credentials or inactive account. New residents must activate their account first.' });
+    const token = jwt.sign({ role, email: resident.email, residentId: resident._id, flatNo: resident.flatNo, tokenVersion: resident.tokenVersion || 0 }, jwtSecret(), { algorithm: 'HS256', expiresIn: '8h' });
+    res.json({ token, role, resident: publicResident(resident) });
+  } catch { res.status(503).json({ message: 'Unable to sign in. Please try again later.' }); }
 };
 
 const bulkCreateResidents = async (req, res) => {
-  try {
-    const { residents } = req.body;
-    if (!residents || !Array.isArray(residents)) {
-      return res.status(400).json({ message: 'Residents array is required' });
-    }
-
-    const created = [];
-    const errors = [];
-
-    for (const data of residents) {
-      const { flatNo, name, mobile, gmail, members } = data;
-      if (!flatNo || !name || !mobile || !gmail) {
-        errors.push(`Flat ${flatNo || 'unknown'}: missing name, mobile, or gmail`);
-        continue;
-      }
-
-      const cleanFlatNo = sanitizeFormula(flatNo.toString());
-      const cleanName = sanitizeFormula(name.toString());
-      const cleanMobile = sanitizeFormula(mobile.toString());
-      const cleanGmail = sanitizeFormula(gmail.toString());
-
-      if (!/^[a-zA-Z]+-\d+$/.test(cleanFlatNo)) {
-        errors.push(`Flat ${flatNo}: Invalid Flat Number format (must be Alphabet-number)`);
-        continue;
-      }
-      if (!/^\d+$/.test(cleanMobile)) {
-        errors.push(`Flat ${flatNo}: Mobile Number must contain only digits`);
-        continue;
-      }
-      if (!/^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i.test(cleanGmail)) {
-        errors.push(`Flat ${flatNo}: Invalid Gmail Address provider`);
-        continue;
-      }
-
-      const formattedGmail = cleanGmail.toLowerCase();
-      const existingGmail = await Resident.findOne({ gmail: formattedGmail });
-      if (existingGmail) {
-        errors.push(`Flat ${flatNo}: A resident with Gmail ${gmail} already exists`);
-        continue;
-      }
-
-      const existingFlat = await Resident.findOne({ flatNo: cleanFlatNo });
-      if (existingFlat) {
-        errors.push(`Flat ${flatNo}: Already registered`);
-        continue;
-      }
-
-      const firstName = cleanName.split(' ')[0].toLowerCase();
-      const flatClean = cleanFlatNo.toLowerCase().replace(/[^a-z0-9]/g, '');
-      let generatedEmail = `${firstName}.${flatClean}@gatepass.com`;
-      let emailExists = await Resident.findOne({ email: generatedEmail });
-      let counter = 1;
-      while (emailExists) {
-        generatedEmail = `${firstName}.${flatClean}${counter}@gatepass.com`;
-        emailExists = await Resident.findOne({ email: generatedEmail });
-        counter++;
-      }
-      
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const generatedCommunityId = Math.floor(10000 + Math.random() * 90000).toString();
-
-      const newResident = await Resident.create({
-        flatNo: cleanFlatNo,
-        name: cleanName,
-        mobile: cleanMobile,
-        email: generatedEmail,
-        gmail: formattedGmail,
-        members: parseInt(members) || 1,
-        otp: generatedOtp,
-        otpExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
-        password: 'resident123',
-        isFirstLogin: true,
-        communityId: generatedCommunityId,
-        status: 'Approved',
-        address: `Flat ${cleanFlatNo}, GatePass Residency`
-      });
-
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const link = `${frontendUrl}/login?email=${generatedEmail}&otp=${generatedOtp}`;
-      
-
-      console.log(`\n=================== BULK IMPORT EMAIL PENDING SEND ===================\nTo: ${formattedGmail}\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\nLogin Link: ${link}\n=======================================================================\n`);
-      sendEmail({
-        to: formattedGmail,
-        subject: 'GatePass Pro - Resident Account Created',
-        text: `Hello ${cleanName},\n\nYour resident account has been created.\n\nUsername: ${generatedEmail}\nDefault Password: resident123\nVerification OTP: ${generatedOtp}\n\nPlease click the link below to login:\n${link}`
-      })
-        .catch((mailError) => {
-          console.log(`[Email Workaround] Retrievable credentials: User=${generatedEmail}, OTP=${generatedOtp}, Link=${link}`);
-        });
-
-      created.push(newResident);
-    }
-
-    if (errors.length > 0 && created.length === 0) {
-      return res.status(400).json({ message: errors.join('; ') });
-    }
-
-    res.status(201).json({
-      message: `Successfully imported ${created.length} residents.`,
-      createdCount: created.length,
-      errors: errors.length > 0 ? errors : undefined
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (!Array.isArray(req.body.residents) || req.body.residents.length > 200) return res.status(400).json({ message: 'Provide up to 200 residents per import' });
+  let count = 0;
+  const errors = [];
+  for (const body of req.body.residents) {
+    try { await createResident(registrationData(body), true); count++; }
+    catch (error) { errors.push(error.message); }
   }
+  res.status(count ? 201 : 400).json({ message: `Imported ${count} residents`, createdCount: count, errors });
 };
 
 const getResidentById = async (req, res) => {
   try {
-    const resident = await Resident.findById(req.params.id).select('-password');
-    if (!resident) {
-      return res.status(404).json({ message: 'Resident not found' });
-    }
-    res.status(200).json(resident);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const resident = await Resident.findById(req.params.id).select(residentFields);
+    if (!resident) return res.status(404).json({ message: 'Resident not found' });
+    res.json(publicResident(resident));
+  } catch { res.status(400).json({ message: 'Invalid resident identifier' }); }
 };
 
 const changeSystemPassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!['admin', 'security'].includes(req.user.role)) return res.status(403).json({ message: 'Forbidden' });
+  if (typeof currentPassword !== 'string' || !validPassword(newPassword)) return res.status(400).json({ message: 'New password must contain 12 to 72 UTF-8 bytes' });
   try {
-    const { currentPassword, newPassword } = req.body;
-    if (req.user.role !== 'admin' && req.user.role !== 'security') {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-    const SystemCredential = require('../models/SystemCredential');
-    let cred = await SystemCredential.findOne({ role: req.user.role });
-    const defaultPassword = req.user.role === 'admin' ? (process.env.ADMIN_PASSWORD || 'admin123') : (process.env.SECURITY_PASSWORD || 'security123');
-    
-    const bcrypt = require('bcryptjs');
-    let isMatch = false;
-    if (cred) {
-      isMatch = await bcrypt.compare(currentPassword, cred.password);
-    } else {
-      isMatch = (currentPassword === defaultPassword);
-    }
-
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Incorrect current password' });
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    if (cred) {
-      cred.password = hashedPassword;
-      await cred.save();
-    } else {
-      await SystemCredential.create({
-        role: req.user.role,
-        password: hashedPassword
-      });
-    }
-    res.status(200).json({ message: 'Password updated successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const credential = await SystemCredential.findOne({ role: req.user.role });
+    if (!credential || !await bcrypt.compare(currentPassword, credential.password)) return res.status(400).json({ message: 'Incorrect current password' });
+    const updated = await SystemCredential.findOneAndUpdate({ _id: credential._id, password: credential.password }, { $set: { password: await bcrypt.hash(newPassword, 12) }, $inc: { tokenVersion: 1 } });
+    if (!updated) return res.status(409).json({ message: 'Password changed concurrently' });
+    res.json({ message: 'Password updated. Please sign in again.' });
+  } catch { res.status(500).json({ message: 'Unable to change password' }); }
 };
 
 const getSystemProfile = async (req, res) => {
+  if (!['admin', 'security'].includes(req.user.role) || (req.query.role && req.query.role !== req.user.role)) return res.status(403).json({ message: 'Forbidden' });
   try {
-    const { role } = req.query;
-    if (role !== 'admin' && role !== 'security') {
-      return res.status(400).json({ message: 'Invalid role' });
-    }
-    const SystemProfile = require('../models/SystemProfile');
-    let profile = await SystemProfile.findOne({ role });
-    if (!profile) {
-      const defaultProfile = role === 'admin' ? {
-        role: 'admin',
-        name: 'System Administrator',
-        email: 'admin@gatepass.com',
-        mobile: 'N/A',
-        communityId: 'ADMIN',
-        bio: 'Main system administrator for GatePass Pro security controls.',
-        location: 'Central Security Tower',
-        address: 'Gate Control Room'
-      } : {
-        role: 'security',
-        name: 'Security Desk Officer',
-        email: 'security@gatepass.com',
-        mobile: 'N/A',
-        communityId: 'SECURITY',
-        bio: 'Gate supervisor for community guest validation and check-ins.',
-        location: 'Main Entry Gate 1',
-        address: 'Security Cabin'
-      };
-      profile = await SystemProfile.create(defaultProfile);
-    }
-    res.status(200).json(profile);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const role = req.user.role;
+    const profile = await SystemProfile.findOneAndUpdate({ role }, { $setOnInsert: { role, name: role === 'admin' ? 'System Administrator' : 'Security Desk Officer', email: `${role}@gatepass.com`, communityId: role.toUpperCase(), mobile: 'N/A', bio: 'GatePass Pro team', location: 'GatePass Residency', address: 'Gate Control Room' } }, { upsert: true, returnDocument: 'after', runValidators: true });
+    res.json(profile);
+  } catch { res.status(500).json({ message: 'Unable to load profile' }); }
 };
 
 const updateSystemProfile = async (req, res) => {
+  if (!['admin', 'security'].includes(req.user.role)) return res.status(403).json({ message: 'Forbidden' });
   try {
-    if (req.user.role !== 'admin' && req.user.role !== 'security') {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-    const { bio, location, address, mobile, gmail } = req.body;
-    const SystemProfile = require('../models/SystemProfile');
-    let profile = await SystemProfile.findOne({ role: req.user.role });
-    if (!profile) {
-      return res.status(404).json({ message: 'Profile not found' });
-    }
-    profile.bio = bio !== undefined ? bio : profile.bio;
-    profile.location = location !== undefined ? location : profile.location;
-    profile.address = address !== undefined ? address : profile.address;
-    profile.mobile = mobile !== undefined ? mobile : profile.mobile;
-    profile.email = gmail !== undefined ? gmail : profile.email;
-    
-    await profile.save();
-    res.status(200).json(profile);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const update = {};
+    for (const field of ['bio', 'location', 'address', 'mobile']) if (req.body[field] !== undefined) update[field] = req.body[field];
+    if (req.body.gmail !== undefined) update.email = req.body.gmail;
+    const profile = await SystemProfile.findOneAndUpdate({ role: req.user.role }, { $set: update }, { returnDocument: 'after', runValidators: true });
+    if (!profile) return res.status(404).json({ message: 'Profile not found' });
+    res.json(profile);
+  } catch { res.status(400).json({ message: 'Unable to update profile' }); }
 };
 
-module.exports = {
-  getResidents,
-  addResident,
-  updateResident,
-  deleteResident,
-  resendOtp,
-  forgotPassword,
-  resetForgotPassword,
-  loginResident,
-  bulkCreateResidents,
-  getResidentById,
-  changeSystemPassword,
-  getSystemProfile,
-  updateSystemProfile
-};
+module.exports = { getResidents, getVehicleDirectory, addResident, updateResident, deleteResident, resendOtp, loginResident, bulkCreateResidents, getResidentById, changeSystemPassword, getSystemProfile, updateSystemProfile };

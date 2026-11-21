@@ -1,8 +1,15 @@
 const rateLimit = require('express-rate-limit');
+const { createHash } = require('node:crypto');
+
+const accountKey = req => createHash('sha256').update(typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : String(req.params.id || 'invalid')).digest('hex');
+const resetIpLimiter = rateLimit({ windowMs: 15 * 60000, limit: 30, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many verification requests. Try again later.' } });
+const resetAccountLimiter = rateLimit({ windowMs: 15 * 60000, limit: 10, keyGenerator: accountKey, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many verification attempts for this account.' } });
+const challengeLimiter = rateLimit({ windowMs: 15 * 60000, limit: 3, keyGenerator: accountKey, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many code requests for this account. Try again later.' } });
 
 const passcodeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  skipSuccessfulRequests: true,
   message: { message: 'Too many verification attempts from this IP, please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -11,6 +18,7 @@ const passcodeLimiter = rateLimit({
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  skipSuccessfulRequests: true,
   message: { message: 'Too many login attempts from this IP, please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -24,4 +32,4 @@ const registrationLimiter = rateLimit({
   legacyHeaders: false
 });
 
-module.exports = { passcodeLimiter, loginLimiter, registrationLimiter };
+module.exports = { passcodeLimiter, loginLimiter, registrationLimiter, resetIpLimiter, resetAccountLimiter, challengeLimiter };

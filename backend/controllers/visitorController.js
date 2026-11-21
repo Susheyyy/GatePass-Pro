@@ -1,337 +1,162 @@
 const Visitor = require('../models/Visitor');
 const FailedAttempt = require('../models/FailedAttempt');
+const Blocklist = require('../models/Blocklist');
+const Resident = require('../models/Resident');
+const Notification = require('../models/Notification');
+const { randomInt } = require('node:crypto');
+
+const safeVisitor = document => {
+  const value = document.toObject ? document.toObject() : { ...document };
+  delete value.passcode;
+  return value;
+};
+const escaped = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function emitVisitor(req, visitor) {
+  const safe = safeVisitor(visitor);
+  req.io?.to(`room_flat_${visitor.flatNo}`).emit('visitor_check_status', safe);
+  req.io?.to('room_security').emit('visitor_approval_changed', safe);
+  req.io?.to('room_admins').emit('visitor_approval_changed', safe);
+}
+async function notifyVisit(req, visitor, checkedIn) {
+  try {
+    const notification = await Notification.create({ recipient: visitor.flatNo, title: checkedIn ? 'Visitor Checked In' : 'Visitor Checked Out', message: `${visitor.name} (${visitor.type}) has ${checkedIn ? 'checked in' : 'checked out'}.`, type: checkedIn ? 'visitor_checkin' : 'visitor_checkout' });
+    req.io?.to(`room_flat_${visitor.flatNo}`).emit('new_notification', notification);
+  } catch { console.error('Visitor notification persistence failed'); }
+}
 
 const getVisitors = async (req, res) => {
   try {
-    const { flatNo, search, page = 1, limit = 50 } = req.query;
-    let query = {};
-    if (flatNo) {
-      query.flatNo = flatNo;
+    const query = {};
+    if (req.user.role === 'resident') query.flatNo = req.user.flatNo;
+    else if (req.query.flatNo) query.flatNo = String(req.query.flatNo).trim().toUpperCase();
+    if (req.query.search) {
+      const search = new RegExp(escaped(req.query.search), 'i');
+      query.$or = ['name', 'type', 'purpose', 'vehicleNumber'].map(field => ({ [field]: search }));
     }
-    if (search) {
-      const searchRegex = new RegExp(search, 'i');
-      query.$or = [
-        { name: searchRegex },
-        { type: searchRegex },
-        { purpose: searchRegex },
-        { vehicleNumber: searchRegex },
-        { passcode: searchRegex }
-      ];
-    }
-    const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
-    const skip = (pageNum - 1) * limitNum;
-    const [visitors, total] = await Promise.all([
-      Visitor.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
-      Visitor.countDocuments(query)
-    ]);
-    const visitorsWithOverdue = visitors.map(v => {
-      const vObj = v.toObject();
-      vObj.isOverdue = v.status === 'Checked In' && v.checkedInAt && (Date.now() - new Date(v.checkedInAt).getTime() > 24 * 60 * 60 * 1000);
-      return vObj;
-    });
-    res.status(200).json({
-      visitors: visitorsWithOverdue,
-      total,
-      page: pageNum,
-      pages: Math.ceil(total / limitNum)
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const page = Math.max(1, Number.parseInt(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, Number.parseInt(req.query.limit) || 50));
+    const [visitors, total] = await Promise.all([Visitor.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), Visitor.countDocuments(query)]);
+    res.json({ visitors: visitors.map(v => ({ ...safeVisitor(v), isOverdue: v.status === 'Checked In' && Date.now() - new Date(v.checkedInAt).getTime() > 86400000 })), total, page, pages: Math.ceil(total / limit) });
+  } catch { res.status(500).json({ message: 'Unable to load visits' }); }
 };
 
 const addVisitor = async (req, res) => {
   try {
-    const { name, type, mobile, flatNo, status, purpose, vehicleNumber } = req.body;
-    if (!name || !type || !flatNo) {
-      return res.status(400).json({ message: 'Name, type, and flat number are required' });
-    }
-
-
-    const Blocklist = require('../models/Blocklist');
-    const isBlocked = await Blocklist.findOne({ mobile });
-    if (isBlocked) {
-      return res.status(400).json({ message: `Visitor mobile ${mobile} is blacklisted: ${isBlocked.reason || 'Security Alert'}` });
-    }
-
-    if (/[<>]/.test(name) || (vehicleNumber && /[<>]/.test(vehicleNumber)) || (purpose && /[<>]/ .test(purpose))) {
-      return res.status(400).json({ message: 'Input contains invalid HTML characters.' });
-    }
-    if (name.length < 2 || name.length > 50) {
-      return res.status(400).json({ message: 'Visitor name must be between 2 and 50 characters.' });
-    }
-    if (!['Guest', 'Delivery', 'Cab', 'Maintenance', 'Other'].includes(type)) {
-      return res.status(400).json({ message: 'Invalid visitor type.' });
-    }
-    if (!/^\d{8,15}$/.test(mobile)) {
-      return res.status(400).json({ message: 'Mobile number must contain 8 to 15 digits.' });
-    }
-    if (!/^[a-zA-Z]+-\d+$/.test(flatNo.trim())) {
-      return res.status(400).json({ message: 'Flat number must be in Alphabet-number format (e.g. A-102).' });
-    }
-    if (vehicleNumber && vehicleNumber.length > 15) {
-      return res.status(400).json({ message: 'Vehicle number must be under 15 characters.' });
-    }
-    if (purpose && purpose.length > 100) {
-      return res.status(400).json({ message: 'Purpose description must be under 100 characters.' });
-    }
-    const generatedPasscode = Math.floor(100000 + Math.random() * 900000).toString();
-    const visitor = await Visitor.create({
-      name,
-      type,
-      mobile,
-      flatNo,
-      passcode: generatedPasscode,
-      status: status || 'Pending',
-      purpose,
-      vehicleNumber,
-      checkedInAt: status === 'Checked In' ? new Date() : undefined
-    });
-
-    if (req.io) {
-      const roomFlat = `room_flat_${flatNo.toUpperCase().trim()}`;
-      req.io.to(roomFlat).emit('visitor_check_status', visitor);
-      req.io.to('room_security').emit('visitor_approval_changed', visitor);
-      req.io.to('room_admins').emit('visitor_approval_changed', visitor);
-    }
-
-    res.status(201).json(visitor);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
+    const { name, type, mobile, purpose = '', vehicleNumber = '' } = req.body;
+    const flatNo = typeof req.body.flatNo === 'string' ? req.body.flatNo.trim().toUpperCase() : '';
+    const status = req.body.status || (req.user.role === 'resident' ? 'Approved' : 'Pending');
+    const allowed = req.user.role === 'resident' || req.user.role === 'admin' ? ['Pending', 'Approved'] : ['Pending'];
+    if (!allowed.includes(status)) return res.status(403).json({ message: 'Register a pending visit or a permitted pre-approval; entry requires pass verification' });
+    if (typeof name !== 'string' || name.trim().length < 2 || name.length > 50 || !['Guest', 'Delivery', 'Cab', 'Maintenance', 'Other'].includes(type) || typeof mobile !== 'string' || !/^\d{8,15}$/.test(mobile) || !/^[A-Z]+-\d+$/.test(flatNo) || typeof purpose !== 'string' || purpose.length > 100 || typeof vehicleNumber !== 'string' || vehicleNumber.length > 15) return res.status(400).json({ message: 'Provide valid visitor details and destination flat' });
+    if (req.user.role === 'resident' && flatNo !== req.user.flatNo) return res.status(403).json({ message: 'You can only create visits for your own flat' });
+    if (!await Resident.exists({ flatNo, status: 'Approved' })) return res.status(400).json({ message: 'No approved resident at this flat' });
+    if (await Blocklist.exists({ mobile })) return res.status(403).json({ message: 'This visitor is blocked' });
+    const passcode = randomInt(100000, 1000000).toString();
+    const visitor = await Visitor.create({ name: name.trim(), type, mobile, flatNo, purpose, vehicleNumber, status, passcode, ...(req.user.role === 'resident' && status === 'Approved' ? { approvedBy: req.user.residentId } : {}) });
+    emitVisitor(req, visitor);
+    // Reveal once to the issuer. Never send plaintext or hashes in list/socket responses.
+    res.status(201).json({ ...safeVisitor(visitor), passcode });
+  } catch { res.status(400).json({ message: 'Unable to register visitor' }); }
 };
 
 const updateVisitor = async (req, res) => {
   try {
     const { status } = req.body;
-    const visitor = await Visitor.findById(req.params.id);
-    if (!visitor) {
-      return res.status(404).json({ message: 'Visitor not found' });
-    }
-    if (status) {
-      visitor.status = status;
-      if (status === 'Approved' || status === 'Rejected') {
-        if (req.user.role === 'resident') {
-          visitor.approvedBy = req.user.residentId;
-        }
-      }
-      if (status === 'Checked In') {
-        visitor.checkedInAt = new Date();
-        try {
-          const Notification = require('../models/Notification');
-          const newNotif = await Notification.create({
-            recipient: visitor.flatNo,
-            title: 'Visitor Checked In',
-            message: `${visitor.name} (${visitor.type}) has checked in to your flat.`,
-            type: 'visitor_checkin'
-          });
-          if (req.io) {
-            req.io.to(`room_flat_${visitor.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
-          }
-        } catch (err) {
-        }
-      } else if (status === 'Checked Out') {
-        visitor.checkedOutAt = new Date();
-        try {
-          const Notification = require('../models/Notification');
-          const newNotif = await Notification.create({
-            recipient: visitor.flatNo,
-            title: 'Visitor Checked Out',
-            message: `${visitor.name} (${visitor.type}) has checked out from your flat.`,
-            type: 'visitor_checkout'
-          });
-          if (req.io) {
-            req.io.to(`room_flat_${visitor.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
-          }
-        } catch (err) {
-        }
-      }
-    }
-    const updatedVisitor = await visitor.save();
-
-    if (req.io) {
-      const roomFlat = `room_flat_${visitor.flatNo.toUpperCase().trim()}`;
-      req.io.to(roomFlat).emit('visitor_check_status', updatedVisitor);
-      req.io.to('room_security').emit('visitor_approval_changed', updatedVisitor);
-      req.io.to('room_admins').emit('visitor_approval_changed', updatedVisitor);
-    }
-
-    res.status(200).json(updatedVisitor);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
+    const role = req.user.role;
+    let previous;
+    if (['Approved', 'Rejected'].includes(status) && ['resident', 'admin'].includes(role)) previous = 'Pending';
+    else if (status === 'Checked Out' && ['security', 'admin'].includes(role)) previous = 'Checked In';
+    else return res.status(403).json({ message: 'Transition not permitted. Check-in requires passcode verification.' });
+    const filter = { _id: req.params.id, status: previous };
+    if (role === 'resident') filter.flatNo = req.user.flatNo;
+    const update = { status };
+    if (role === 'resident') update.approvedBy = req.user.residentId;
+    if (status === 'Checked Out') update.checkedOutAt = new Date();
+    const visitor = await Visitor.findOneAndUpdate(filter, { $set: update }, { returnDocument: 'after', runValidators: true });
+    if (!visitor) return res.status(409).json({ message: 'Visit changed or this transition is no longer allowed. Refresh the list.' });
+    emitVisitor(req, visitor);
+    if (status === 'Checked Out') await notifyVisit(req, visitor, false);
+    res.json(safeVisitor(visitor));
+  } catch { res.status(400).json({ message: 'Invalid visitor update' }); }
 };
 
 const deleteVisitor = async (req, res) => {
   try {
-    const visitor = await Visitor.findById(req.params.id);
-    if (!visitor) {
-      return res.status(404).json({ message: 'Visitor not found' });
-    }
-    if (['Approved', 'Checked In', 'Checked Out'].includes(visitor.status)) {
-      return res.status(400).json({ message: 'Approved or checked-in/out visitor records cannot be removed' });
-    }
-    await visitor.deleteOne();
-    res.status(200).json({ message: 'Visitor removed successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const filter = { _id: req.params.id, status: { $in: ['Pending', 'Rejected'] } };
+    if (req.user.role === 'resident') filter.flatNo = req.user.flatNo;
+    const deleted = await Visitor.findOneAndDelete(filter);
+    if (!deleted) return res.status(409).json({ message: 'Only pending or rejected visits can be removed' });
+    res.json({ message: 'Visitor removed' });
+  } catch { res.status(400).json({ message: 'Invalid visitor identifier' }); }
 };
+
+async function recordFailure(flatNo) {
+  const now = new Date();
+  const expired = { $and: [{ $ne: [{ $ifNull: ['$lockedUntil', null] }, null] }, { $lte: ['$lockedUntil', now] }] };
+  const active = { $gt: ['$lockedUntil', now] };
+  const pipeline = [
+    { $set: { flatNo, count: { $cond: [active, '$count', { $add: [{ $cond: [expired, 0, { $ifNull: ['$count', 0] }] }, 1] }] }, lockedUntil: { $cond: [expired, null, { $ifNull: ['$lockedUntil', null] }] } } },
+    { $set: { lockedUntil: { $cond: [{ $gte: ['$count', 3] }, { $ifNull: ['$lockedUntil', new Date(now.getTime() + 900000)] }, null] } } }
+  ];
+  try {
+    return await FailedAttempt.findOneAndUpdate({ flatNo }, pipeline, { upsert: true, returnDocument: 'after', updatePipeline: true });
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    // First concurrent insert may lose the unique-key race: increment the winner.
+    return FailedAttempt.findOneAndUpdate({ flatNo }, pipeline, { returnDocument: 'after', updatePipeline: true });
+  }
+}
 
 const verifyPasscode = async (req, res) => {
+  if (!['admin', 'security'].includes(req.user.role)) return res.status(403).json({ message: 'Only gate staff can admit visitors' });
+  const { passcode } = req.body;
+  const flatNo = typeof req.body.flatNo === 'string' ? req.body.flatNo.trim().toUpperCase() : '';
+  if (!/^[A-Z]+-\d+$/.test(flatNo) || typeof passcode !== 'string' || !/^\d{6}$/.test(passcode)) return res.status(400).json({ message: 'Enter a valid flat and 6-digit passcode' });
   try {
-    const { flatNo, passcode } = req.body;
-    if (!flatNo || !passcode) {
-      return res.status(400).json({ message: 'Flat number and passcode are required' });
+    const attempts = await FailedAttempt.findOne({ flatNo });
+    if (attempts?.lockedUntil > new Date()) return res.status(429).json({ message: 'This flat is locked for 15 minutes after repeated invalid attempts' });
+    const cutoff = new Date(Date.now() - 86400000);
+    const candidates = await Visitor.find({ flatNo, status: 'Approved', createdAt: { $gt: cutoff } }).select('+passcode');
+    let matched;
+    for (const candidate of candidates) if (await candidate.matchPasscode(passcode)) { matched = candidate; break; }
+    if (!matched) {
+      const failure = await recordFailure(flatNo);
+      return res.status(failure.count >= 3 ? 429 : 400).json({ message: failure.count >= 3 ? 'Too many invalid attempts. Flat locked for 15 minutes.' : 'Invalid, unapproved, expired or already used passcode' });
     }
-
-    const flatKey = flatNo.trim().toUpperCase();
-    const attempts = await FailedAttempt.findOne({ flatNo: flatKey }) || { count: 0, lockedUntil: null };
-
-    if (attempts.lockedUntil && attempts.lockedUntil > new Date()) {
-      const remainingTime = Math.ceil((attempts.lockedUntil - new Date()) / 1000 / 60);
-      return res.status(403).json({ message: `Flat ${flatNo} is locked out. Try again in ${remainingTime} minutes.` });
-    }
-
-    const visitors = await Visitor.find({ flatNo: new RegExp(`^${flatKey}$`, 'i') });
-    let visitor = null;
-    for (const v of visitors) {
-      const isMatch = await v.matchPasscode(passcode.trim());
-      if (isMatch) {
-        visitor = v;
-        break;
-      }
-    }
-
-    if (!visitor) {
-      const newCount = (attempts.count || 0) + 1;
-      const locked = newCount >= 3;
-      await FailedAttempt.findOneAndUpdate(
-        { flatNo: flatKey },
-        { count: newCount, lockedUntil: locked ? new Date(Date.now() + 15 * 60 * 1000) : null },
-        { upsert: true, new: true }
-      );
-      if (locked) {
-        return res.status(403).json({ message: `Too many invalid attempts. Flat ${flatNo} is locked out for 15 minutes.` });
-      }
-      return res.status(400).json({ message: `Invalid passcode. Attempts remaining for flat: ${3 - newCount}` });
-    }
-
-    if (visitor.status === 'Checked In' || visitor.status === 'Checked Out') {
-      return res.status(400).json({ message: 'This passcode has already been used.' });
-    }
-
-    const createdTime = new Date(visitor.createdAt);
-    if (Date.now() - createdTime.getTime() > 24 * 60 * 60 * 1000) {
-      return res.status(400).json({ message: 'This passcode has expired.' });
-    }
-
-    await FailedAttempt.findOneAndDelete({ flatNo: flatKey });
-
-    visitor.status = 'Checked In';
-    visitor.checkedInAt = new Date();
-    const updatedVisitor = await visitor.save();
-
-    try {
-      const Notification = require('../models/Notification');
-      const newNotif = await Notification.create({
-        recipient: visitor.flatNo,
-        title: 'Visitor Checked In',
-        message: `${visitor.name} (${visitor.type}) has checked in to your flat.`,
-        type: 'visitor_checkin'
-      });
-      if (req.io) {
-        req.io.to(`room_flat_${visitor.flatNo.toUpperCase().trim()}`).emit('new_notification', newNotif);
-      }
-    } catch (err) {}
-
-    if (req.io) {
-      const roomFlat = `room_flat_${visitor.flatNo.toUpperCase().trim()}`;
-      req.io.to(roomFlat).emit('visitor_check_status', updatedVisitor);
-      req.io.to('room_security').emit('visitor_approval_changed', updatedVisitor);
-      req.io.to('room_admins').emit('visitor_approval_changed', updatedVisitor);
-    }
-
-    res.status(200).json(updatedVisitor);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    if (await Blocklist.exists({ mobile: matched.mobile })) return res.status(403).json({ message: 'This visitor is blocked' });
+    if (await FailedAttempt.exists({ flatNo, lockedUntil: { $gt: new Date() } })) return res.status(429).json({ message: 'This flat is locked for 15 minutes' });
+    const visitor = await Visitor.findOneAndUpdate({ _id: matched._id, status: 'Approved', createdAt: { $gt: new Date(Date.now() - 86400000) } }, { $set: { status: 'Checked In', checkedInAt: new Date() } }, { returnDocument: 'after' });
+    if (!visitor) return res.status(409).json({ message: 'Passcode already used or expired. Refresh the list.' });
+    // Do not erase failures recorded by another verification while this request was running.
+    if (attempts) await FailedAttempt.updateOne({ _id: attempts._id, count: attempts.count, updatedAt: attempts.updatedAt }, { $set: { count: 0, lockedUntil: null } });
+    emitVisitor(req, visitor);
+    await notifyVisit(req, visitor, true);
+    res.json(safeVisitor(visitor));
+  } catch { res.status(500).json({ message: 'Unable to verify entry. No local entry has been recorded.' }); }
 };
 
+const csvCell = value => '"' + String(value ?? '').replace(/^[=+@\-]/, "'$&").replace(/"/g, '""') + '"';
 const exportVisitorsCSV = async (req, res) => {
   try {
     const visitors = await Visitor.find({}).sort({ createdAt: -1 });
+    const fields = ['name', 'type', 'mobile', 'flatNo', 'status', 'purpose', 'vehicleNumber', 'checkedInAt', 'checkedOutAt', 'createdAt'];
+    const csv = [fields.join(','), ...visitors.map(v => fields.map(field => csvCell(v[field])).join(','))].join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=visitors_log.csv');
-    
-    let csv = 'Name,Type,Mobile,Flat Number,Status,Purpose,Vehicle Number,Passcode,Checked In,Checked Out,Created At\n';
-    visitors.forEach(v => {
-      const checkedInStr = v.checkedInAt ? v.checkedInAt.toISOString() : '';
-      const checkedOutStr = v.checkedOutAt ? v.checkedOutAt.toISOString() : '';
-      const createdAtStr = v.createdAt ? v.createdAt.toISOString() : '';
-      csv += `"${v.name}","${v.type}","${v.mobile}","${v.flatNo}","${v.status}","${v.purpose || ''}","${v.vehicleNumber || ''}","[MASKED]","${checkedInStr}","${checkedOutStr}","${createdAtStr}"\n`;
-    });
-    res.status(200).send(csv);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    res.send(csv);
+  } catch { res.status(500).json({ message: 'Unable to export visitors' }); }
 };
-
-
 const addBlocklist = async (req, res) => {
-  try {
-    const { mobile, reason } = req.body;
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-    const Blocklist = require('../models/Blocklist');
-    let blocked = await Blocklist.findOne({ mobile });
-    if (blocked) {
-      return res.status(400).json({ message: 'Mobile number is already blacklisted.' });
-    }
-    blocked = await Blocklist.create({ mobile, reason });
-    res.status(201).json(blocked);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  if (typeof req.body.mobile !== 'string' || !/^\d{8,15}$/.test(req.body.mobile) || (req.body.reason && (typeof req.body.reason !== 'string' || req.body.reason.length > 200))) return res.status(400).json({ message: 'Invalid mobile or reason' });
+  try { res.status(201).json(await Blocklist.create({ mobile: req.body.mobile, reason: req.body.reason })); }
+  catch { res.status(400).json({ message: 'Unable to block visitor' }); }
 };
-
 const getBlocklist = async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-    const Blocklist = require('../models/Blocklist');
-    const list = await Blocklist.find({}).sort({ createdAt: -1 });
-    res.status(200).json(list);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  try { res.json(await Blocklist.find({}).sort({ createdAt: -1 })); }
+  catch { res.status(500).json({ message: 'Unable to load blocklist' }); }
 };
-
 const removeBlocklist = async (req, res) => {
-  try {
-    const { mobile } = req.params;
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-    const Blocklist = require('../models/Blocklist');
-    await Blocklist.deleteOne({ mobile });
-    res.status(200).json({ message: 'Mobile number removed from blocklist.' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  try { await Blocklist.deleteOne({ mobile: req.params.mobile }); res.json({ message: 'Visitor removed from blocklist' }); }
+  catch { res.status(500).json({ message: 'Unable to update blocklist' }); }
 };
-
-module.exports = {
-  getVisitors,
-  addVisitor,
-  updateVisitor,
-  deleteVisitor,
-  verifyPasscode,
-  exportVisitorsCSV,
-  addBlocklist,
-  getBlocklist,
-  removeBlocklist
-};
+module.exports = { getVisitors, addVisitor, updateVisitor, deleteVisitor, verifyPasscode, exportVisitorsCSV, addBlocklist, getBlocklist, removeBlocklist };

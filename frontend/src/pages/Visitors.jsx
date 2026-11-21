@@ -11,6 +11,7 @@ import { visitorApi, getUserFromToken } from '../services/api';
 import { getSocket } from '../services/socket';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
+import IssuedPass from '../components/IssuedPass';
 
 const ExpiryCountdown = ({ createdAt }) => {
   const [timeLeft, setTimeLeft] = useState('');
@@ -44,6 +45,7 @@ const ExpiryCountdown = ({ createdAt }) => {
 export default function Visitors() {
   const toast = useToast();
   const [visitors, setVisitors] = useState([]);
+  const [issuedPass, setIssuedPass] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -133,7 +135,8 @@ export default function Visitors() {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
-      await visitorApi.create(formData);
+      const created = await visitorApi.create(formData);
+      setIssuedPass(created);
       setIsAddOpen(false);
       setFormData({
         name: '',
@@ -254,6 +257,7 @@ export default function Visitors() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+      <IssuedPass visitor={issuedPass} onDismiss={() => setIssuedPass(null)} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.025em' }}>
@@ -384,7 +388,7 @@ export default function Visitors() {
                       </span>
                     </td>
                     <td style={{ padding: '16px', textAlign: 'center', fontWeight: '700', fontSize: '1rem', color: 'var(--accent)' }}>
-                      <code>{visitor.passcode}</code>
+                      <code>{visitor.passcode || 'Shown at issuance'}</code>
                       {visitor.status === 'Approved' && (
                         <ExpiryCountdown createdAt={visitor.createdAt} />
                       )}
@@ -419,7 +423,7 @@ export default function Visitors() {
 
                         {visitor.status === 'Approved' && (
                           <button
-                            onClick={() => handleStatusUpdate(visitor._id, 'Checked In')}
+                            onClick={() => { setVerifyFlatNo(visitor.flatNo); setVerifyPasscode(''); toast.success('Enter the visitor passcode in the verification form to check in.'); }}
                             title="Check In"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--success)', padding: '6px' }}
                           >

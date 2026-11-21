@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { residentApi, getUserInfo } from '../services/api';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
+import { useNavigate } from 'react-router-dom';
+import { isDemoSession } from '../services/demo';
+import { disconnectSocket } from '../services/socket';
 
 export default function Profile() {
+  const navigate = useNavigate();
   const toast = useToast();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +57,7 @@ export default function Profile() {
           matched = await residentApi.getById(residentId);
         } else {
           const list = await residentApi.getAll();
-          matched = list.find(r => r.email.toLowerCase() === residentEmail?.toLowerCase());
+          matched = list.find(r => r.email?.toLowerCase() === residentEmail?.toLowerCase());
         }
         if (matched) {
           if (!matched.communityId) {
@@ -131,8 +135,8 @@ export default function Profile() {
       toast.warning('New passwords do not match!');
       return;
     }
-    if (passwordData.newPassword.length < 6) {
-      toast.warning('Password must be at least 6 characters long.');
+    if (new TextEncoder().encode(passwordData.newPassword).length < 12 || new TextEncoder().encode(passwordData.newPassword).length > 72) {
+      toast.warning('Password must contain 12 to 72 UTF-8 bytes.');
       return;
     }
     setChangingPassword(true);
@@ -156,6 +160,11 @@ export default function Profile() {
         }
       }
       setPasswordData({ currentPassword: '', otp: '', newPassword: '', confirmNewPassword: '' });
+      if (!isDemoSession()) {
+        disconnectSocket();
+        sessionStorage.removeItem('gatepass_token');
+        navigate('/login');
+      }
     } catch (err) {
       toast.error(err.message || 'Failed to change password.');
     } finally {

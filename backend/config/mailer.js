@@ -27,7 +27,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
     console.log('Email sent successfully via Resend API!');
     return data;
   } catch (error) {
-    console.error('Mail Send Error (Resend API):', error.message);
+    console.error('Mail delivery failed');
     throw error;
   }
 };
