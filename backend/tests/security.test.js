@@ -9,6 +9,8 @@ const FailedAttempt = require('../models/FailedAttempt');
 const SystemCredential = require('../models/SystemCredential');
 const Blocklist = require('../models/Blocklist');
 const Notification = require('../models/Notification');
+const Session = require('../models/Session');
+const Household = require('../models/Household');
 const { publicResident, issueOtp, otpHash, jwtSecret, validateConfig } = require('../config/security');
 const { protectRoute, authenticate } = require('../middleware/authMiddleware');
 const residents = require('../controllers/residentController');
@@ -19,8 +21,8 @@ process.env.JWT_SECRET = randomBytes(48).toString('hex');
 const query = value => ({ select() { return this; }, sort() { return this; }, skip() { return this; }, limit() { return this; }, then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
 const response = () => ({ code: 200, status(value) { this.code = value; return this; }, json(value) { this.body = value; return this; } });
 const id = '507f1f77bcf86cd799439011';
-const account = { _id: id, name: 'Test Resident', email: 'test@example.com', gmail: 'test@example.com', flatNo: 'A-101', status: 'Approved', isFirstLogin: false, tokenVersion: 0 };
-const request = (body = {}, role = 'admin') => ({ body, user: { role, residentId: id, flatNo: 'A-101' }, params: { id }, query: {} });
+const account = { _id: id, name: 'Test Resident', email: 'test@example.com', gmail: 'test@example.com', flatNo: 'A-101', status: 'Approved', isFirstLogin: false, tokenVersion: 0, occupancyId: 'test-occupancy' };
+const request = (body = {}, role = 'admin') => ({ body, user: { role, residentId: id, flatNo: 'A-101', occupancyId: account.occupancyId }, params: { id }, query: {} });
 
 test('configuration rejects missing/known signing keys and weak bootstrap passwords', t => {
   const secret = process.env.JWT_SECRET;
@@ -65,8 +67,16 @@ test('password/OTP bodies cannot bypass authentication', async () => {
 test('resident sessions require approval, completed activation and current token version', async t => {
   const record = { ...account };
   t.mock.method(Resident, 'findById', () => query(record));
-  const token = jwt.sign({ role: 'resident', residentId: id, tokenVersion: 0 }, process.env.JWT_SECRET);
+  const session = { role: 'resident', actorKey: `resident:${id}`, tokenVersion: 0, occupancyId: account.occupancyId, expiresAt: new Date(Date.now() + 60000) };
+  t.mock.method(Session, 'findById', () => query(session));
+  const token = jwt.sign({ role: 'resident', residentId: id, sid: 'test-session', tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' });
   assert.equal((await authenticate(token)).flatNo, 'A-101');
+  session.revokedAt = new Date();
+  await assert.rejects(authenticate(token));
+  session.revokedAt = null;
+  session.occupancyId = 'previous-occupancy';
+  await assert.rejects(authenticate(token));
+  session.occupancyId = account.occupancyId;
   record.status = 'Rejected';
   await assert.rejects(authenticate(token));
   record.status = 'Approved'; record.isFirstLogin = true;
@@ -89,6 +99,7 @@ test('privileged defaults and first-login residents never receive a JWT', async 
 
 test('resident list scopes to their flat and strips co-resident contact information', async t => {
   let filter;
+  t.mock.method(Household, 'find', () => query([]));
   t.mock.method(Resident, 'find', value => { filter = value; return query([{ ...account, otp: 'secret' }, { ...account, _id: 'other-id', email: 'private@example.com', gmail: 'private@example.com', mobile: '1234567890' }]); });
   t.mock.method(Resident, 'countDocuments', () => query(2));
   const res = response(); await residents.getResidents(request({}, 'resident'), res);
@@ -122,6 +133,8 @@ test('status updates cannot bypass pass verification or gate roles', async () =>
 
 test('approval and checkout enforce previous state with compare-and-swap', async t => {
   const filters = [];
+  t.mock.method(Visitor, 'findOne', () => query({ flatNo: account.flatNo, hostResidentId: id, hostOccupancyId: account.occupancyId }));
+  t.mock.method(Resident, 'exists', () => query({ _id: id }));
   t.mock.method(Visitor, 'findOneAndUpdate', filter => { filters.push(filter); return query(null); });
   for (const [role, status] of [['resident', 'Approved'], ['security', 'Checked Out']]) {
     const res = response(); await visitors.updateVisitor(request({ status }, role), res);
@@ -151,8 +164,9 @@ test('active flat lockouts reject even a correct code before lookup', async t =>
 });
 
 test('concurrent correct verifications consume a pass once and never return the hash', async t => {
-  const visitor = { _id: id, name: 'Guest', flatNo: 'A-101', mobile: '1234567890', type: 'Guest', status: 'Approved', passcode: 'stored-hash', matchPasscode: async () => true };
+  const visitor = { _id: id, name: 'Guest', flatNo: 'A-101', mobile: '1234567890', type: 'Guest', status: 'Approved', hostResidentId: id, hostOccupancyId: account.occupancyId, audienceOccupancyIds: [account.occupancyId], passcode: 'stored-hash', matchPasscode: async () => true };
   let state = 'Approved';
+  t.mock.method(Resident, 'exists', () => query({ _id: id }));
   t.mock.method(FailedAttempt, 'findOne', () => query(null));
   t.mock.method(FailedAttempt, 'exists', () => query(null));
   t.mock.method(Blocklist, 'exists', () => query(null));
@@ -177,6 +191,7 @@ test('malformed reset payloads are rejected before touching the database', async
 });
 
 test('reset attempts are bounded and a correct challenge can be consumed only once', async t => {
+  t.mock.method(Session, 'updateMany', () => query({ modifiedCount: 1 }));
   const challenge = issueOtp(account.email, 'reset');
   const record = { ...account, ...challenge.fields };
   t.mock.method(Resident, 'findOneAndUpdate', (filter, update) => {
@@ -250,4 +265,25 @@ test('HTTP routes deny the old reset bypass and rate-limit recovery by account a
       else await result.text();
     }
   } finally { await new Promise(resolve => io.close(resolve)); }
+});
+
+
+test('resident validation rejects malformed collections and normalizes registration fields', () => {
+  const { residentInput } = require('../services/residentValidation');
+  const input = { flatNo: ' a-101 ', name: ' Test Resident ', mobile: '1234567890', gmail: ' TEST@EXAMPLE.COM ', members: '2' };
+  const validated = residentInput(input);
+  assert.equal(validated.flatNo, 'A-101'); assert.equal(validated.gmail, 'test@example.com'); assert.equal(validated.members, 2);
+  for (const patch of [{ members: 0 }, { vehicles: ['ABC', 'ABC'] }, { gmail: { $ne: null } }, { flatNo: 'invalid' }]) {
+    assert.throws(() => residentInput({ ...input, ...patch }));
+  }
+});
+
+test('notification access and receipts are tied to individual occupancy identities', () => {
+  const { notificationScope } = require('../services/notifications');
+  const { principal } = require('../controllers/notificationController');
+  const user = { role: 'resident', residentId: id, occupancyId: 'current-occupancy' };
+  assert.deepEqual(notificationScope(user), { audienceOccupancyIds: 'current-occupancy' });
+  assert.notEqual(principal(user), principal({ ...user, occupancyId: 'previous-occupancy' }));
+  assert.notEqual(principal(user), principal({ ...user, residentId: 'other' }));
+  assert.deepEqual(notificationScope({ role: 'security' }), { recipient: { $in: ['security', 'all'] } });
 });

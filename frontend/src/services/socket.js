@@ -1,12 +1,11 @@
 import { io } from 'socket.io-client';
 import { isDemoSession } from './demo.js';
+import { socketOrigin } from './apiConfig.js';
 
 let socket = null;
 let currentRoomInfo = null;
 
-const SOCKET_URL = import.meta.env?.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.split('/api')[0]
-  : 'http://localhost:5000';
+const SOCKET_URL = socketOrigin;
 
 export const connectSocket = (role, flatNo) => {
   if (isDemoSession()) {
@@ -37,6 +36,13 @@ export const connectSocket = (role, flatNo) => {
 
   socket.on('connect', () => {
     socket.emit('join_room', { role, flatNo });
+  });
+  socket.on('disconnect', reason => {
+    if (reason === 'io server disconnect') {
+      sessionStorage.removeItem('gatepass_token');
+      sessionStorage.removeItem('gatepass_user');
+      window.dispatchEvent(new Event('gatepass_session_expired'));
+    }
   });
 
   return socket;

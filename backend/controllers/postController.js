@@ -1,144 +1,76 @@
 const mongoose = require('mongoose');
 const Post = require('../models/Post');
-const Notification = require('../models/Notification');
-const Resident = require('../models/Resident');
+const { publishNotification } = require('../services/notifications');
+
+const MAX_COMMENTS = 200;
+const categories = ['Notice', 'Event', 'Complaint', 'Lost & Found', 'General'];
+const validText = (value, max) => typeof value === 'string' && value.trim().length > 0 && value.length <= max;
+
+function authorIdentity(user) {
+  const id = user.actorId || user.residentId;
+  if (!id || (user.role === 'resident' && !user.occupancyId)) throw new Error('Authenticated author identity required');
+  return {
+    authorPrincipal: `${user.role}:${id}:${user.occupancyId || ''}`,
+    authorName: user.role === 'resident' ? user.name : user.role === 'admin' ? 'System Admin' : 'Security Officer',
+    flatNo: user.role === 'resident' ? user.flatNo : user.role === 'admin' ? 'Admin' : 'Security'
+  };
+}
+
+async function notify(req, data) {
+  try { await publishNotification(req, { ...data, type: 'community' }); }
+  catch { console.error('Community notification delivery failed'); }
+}
 
 const getPosts = async (req, res) => {
   try {
-    const posts = await Post.find().sort({ createdAt: -1 });
-    res.status(200).json(posts);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const page = Math.max(1, Number.parseInt(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, Number.parseInt(req.query.limit) || 50));
+    const [posts, total] = await Promise.all([
+      Post.find().sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit),
+      Post.countDocuments({})
+    ]);
+    res.json({ posts, total, page, pages: Math.ceil(total / limit) });
+  } catch { res.status(500).json({ message: 'Unable to load community posts' }); }
 };
 
 const createPost = async (req, res) => {
-  const { title, description, category } = req.body;
+  const { title, description, category = 'General' } = req.body;
+  if (!validText(title, 120) || !validText(description, 5000) || !categories.includes(category)) return res.status(400).json({ message: 'Provide a title up to 120 characters, a description up to 5000 characters, and a valid category' });
   try {
-    let authorName = 'System Admin';
-    let flatNo = 'Admin';
-
-    if (req.user.role === 'resident') {
-      const resident = await Resident.findOne({ email: req.user.email });
-      if (!resident) {
-        return res.status(404).json({ message: 'Resident account not found' });
-      }
-      authorName = resident.name;
-      flatNo = resident.flatNo;
-    }
-
-    const newPost = new Post({
-      title,
-      description,
-      authorName,
-      flatNo,
-      category: category || 'General'
-    });
-    const saved = await newPost.save();
-    try {
-      const newNotif = await Notification.create({
-        recipient: 'all',
-        title: 'New Community Announcement',
-        message: `${authorName} (Flat ${flatNo}) posted: "${title}"`,
-        type: 'community'
-      });
-      if (req.io) {
-        req.io.to('room_admins').emit('new_notification', newNotif);
-        const uniqueFlats = await Resident.distinct('flatNo');
-        uniqueFlats.forEach(flat => {
-          req.io.to(`room_flat_${flat.toUpperCase().trim()}`).emit('new_notification', newNotif);
-        });
-      }
-    } catch (err) {
-    }
-
+    const author = authorIdentity(req.user);
+    const saved = await Post.create({ title: title.trim(), description: description.trim(), category, ...author });
+    await notify(req, { recipient: 'all', title: 'New Community Announcement', message: `${author.authorName} (Flat ${author.flatNo}) posted: "${saved.title}"` });
     res.status(201).json(saved);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
+  } catch { res.status(500).json({ message: 'Unable to create community post' }); }
 };
 
 const addComment = async (req, res) => {
-  const { id } = req.params;
   const { text } = req.body;
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ message: 'Post not found' });
+  if (!validText(text, 2000)) return res.status(400).json({ message: 'Comment must contain 1 to 2000 characters' });
   try {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-    const post = await Post.findById(id);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-
-    let authorName = 'System Admin';
-    let flatNo = 'Admin';
-
-    if (req.user.role === 'resident') {
-      const resident = await Resident.findOne({ email: req.user.email });
-      if (!resident) {
-        return res.status(404).json({ message: 'Resident account not found' });
-      }
-      authorName = resident.name;
-      flatNo = resident.flatNo;
-    }
-
-    post.comments.push({ text, authorName, flatNo });
-    const saved = await post.save();
-    try {
-      const isSystemAdmin = flatNo === 'Admin' || authorName === 'System Admin' || authorName === 'System Administrator';
-      await Notification.create({
-        recipient: isSystemAdmin ? 'all' : 'admin',
-        title: isSystemAdmin ? 'Admin Commented on Post' : 'New Comment on Post',
-        message: `${authorName} (${flatNo}): "${text.length > 50 ? text.substring(0, 50) + '...' : text}" on post "${post.title}"`,
-        type: 'community'
-      });
-      if (req.io) {
-        if (isSystemAdmin) {
-          req.io.to('room_admins').emit('new_notification', newNotif);
-          const uniqueFlats = await Resident.distinct('flatNo');
-          uniqueFlats.forEach(flat => {
-            req.io.to(`room_flat_${flat.toUpperCase().trim()}`).emit('new_notification', newNotif);
-          });
-        } else {
-          req.io.to('room_admins').emit('new_notification', newNotif);
-        }
-      }
-    } catch (err) {}
-
+    const author = authorIdentity(req.user);
+    // The size guard and append share one atomic update. Concurrent writers
+    // cannot overwrite each other or exceed the embedded collection's limit.
+    const saved = await Post.findOneAndUpdate({ _id: req.params.id, [`comments.${MAX_COMMENTS - 1}`]: { $exists: false } },
+      { $push: { comments: { text: text.trim(), ...author, createdAt: new Date() } } },
+      { returnDocument: 'after', runValidators: true });
+    if (!saved) return res.status(409).json({ message: 'Post unavailable or comment limit reached. Refresh the board.' });
+    await notify(req, { recipient: req.user.role === 'admin' ? 'all' : 'admin', title: 'New Comment on Post', message: `${author.authorName} (${author.flatNo}): "${text.trim().slice(0, 50)}" on post "${saved.title}"` });
     res.status(201).json(saved);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
+  } catch { res.status(500).json({ message: 'Unable to add comment' }); }
 };
 
 const deletePost = async (req, res) => {
-  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ message: 'Post not found' });
   try {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-    const post = await Post.findById(id);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-
-    if (req.user.role !== 'admin') {
-      const resident = await Resident.findOne({ email: req.user.email });
-      if (!resident || resident.flatNo !== post.flatNo) {
-        return res.status(403).json({ message: 'Forbidden: You cannot delete this post' });
-      }
-    }
-
-    await post.deleteOne();
-    res.status(200).json({ message: 'Post deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    const filter = { _id: req.params.id };
+    // Legacy posts without an author principal remain administrator-managed.
+    if (req.user.role !== 'admin') filter.authorPrincipal = authorIdentity(req.user).authorPrincipal;
+    const deleted = await Post.findOneAndDelete(filter);
+    if (!deleted) return res.status(404).json({ message: 'Post not found or you do not own it' });
+    res.json({ message: 'Post deleted successfully' });
+  } catch { res.status(500).json({ message: 'Unable to delete post' }); }
 };
 
-module.exports = {
-  getPosts,
-  createPost,
-  addComment,
-  deletePost
-};
+module.exports = { getPosts, createPost, addComment, deletePost, authorIdentity, MAX_COMMENTS };

@@ -1,3 +1,4 @@
+import { downloadCSV } from '../services/csv';
 import { useState, useEffect } from 'react';
 import { 
 Ban, 
@@ -7,7 +8,7 @@ Ban,
   LogIn,
   X 
 } from 'lucide-react';
-import { visitorApi, getUserFromToken } from '../services/api';
+import { visitorApi, residentApi, getUserFromToken } from '../services/api';
 import { getSocket } from '../services/socket';
 import { FormInput, FormButton } from '../components/FormComponents';
 import { useToast } from '../context/ToastContext';
@@ -60,6 +61,9 @@ export default function Visitors() {
     status: 'Pending'
   });
   const [selectedVisitor, setSelectedVisitor] = useState(null);
+  const [hosts, setHosts] = useState({ flatNo: '', rows: [], error: '' });
+  const [selectedHost, setSelectedHost] = useState({ flatNo: '', id: '' });
+  const destination = formData.flatNo.trim().toUpperCase();
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const user = getUserFromToken();
   const userRole = user ? user.role : 'admin';
@@ -72,11 +76,24 @@ export default function Visitors() {
   const [targetBlockMobile, setTargetBlockMobile] = useState('');
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isAddOpen || userRole === 'resident' || !destination) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      residentApi.getHosts(destination).then(rows => {
+        if (active) setHosts({ flatNo: destination, rows, error: '' });
+      }).catch(error => {
+        if (active) setHosts({ flatNo: destination, rows: [], error: error.message });
+      });
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  }, [destination, isAddOpen, userRole]);
+
   const fetchBlocklist = async () => {
     try {
       const data = await visitorApi.getBlocklist();
       setBlocklist(data);
-    } catch (err) {}
+    } catch { toast.error('Unable to load the blocklist.'); }
   };
 
   const fetchVisitors = async (query = '') => {
@@ -84,6 +101,7 @@ export default function Visitors() {
     try {
       const data = await visitorApi.getAll({ search: query });
       setVisitors(data);
+      setError('');
     } catch (err) {
       setError('Failed to fetch visitors.');
     } finally {
@@ -135,7 +153,7 @@ export default function Visitors() {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
-      const created = await visitorApi.create(formData);
+      const created = await visitorApi.create({ ...formData, hostResidentId: selectedHost.flatNo === destination ? selectedHost.id || undefined : undefined });
       setIssuedPass(created);
       setIsAddOpen(false);
       setFormData({
@@ -150,7 +168,7 @@ export default function Visitors() {
       fetchVisitors(searchQuery);
       toast.success('Visitor registered successfully!');
     } catch (err) {
-      toast.error('Failed to register visitor.');
+      toast.error(err.message || 'Failed to register visitor.');
     }
   };
 
@@ -236,27 +254,19 @@ export default function Visitors() {
       v.purpose || '',
       v.vehicleNumber || '',
       v.flatNo || '',
-      v.passcode || '',
+      '[MASKED]',
       v.status || '',
       v.checkedInAt ? new Date(v.checkedInAt).toLocaleString() : '',
       v.checkedOutAt ? new Date(v.checkedOutAt).toLocaleString() : ''
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `visitor_logs_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCSV(`visitor_logs_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
     toast.success('Visitor logs exported to CSV.');
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+      {error && <p role="alert">{error}</p>}
       <IssuedPass visitor={issuedPass} onDismiss={() => setIssuedPass(null)} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div>
@@ -555,6 +565,19 @@ export default function Visitors() {
                 onChange={handleInputChange}
                 required
               />
+
+              {userRole !== 'resident' && destination && (
+                <label>
+                  Host resident
+                  <select className="input-field" value={selectedHost.flatNo === destination ? selectedHost.id : ''}
+                    required={hosts.flatNo === destination && hosts.rows.length > 1}
+                    onChange={event => setSelectedHost({ flatNo: destination, id: event.target.value })}>
+                    <option value="">{hosts.flatNo !== destination ? 'Loading hosts...' : hosts.rows.length === 1 ? hosts.rows[0].name : 'Choose a host'}</option>
+                    {hosts.flatNo === destination && hosts.rows.map(host => <option key={host._id} value={host._id}>{host.name}</option>)}
+                  </select>
+                  {hosts.flatNo === destination && (hosts.error || !hosts.rows.length) && <span role="alert">{hosts.error || 'No activated resident is available in this flat.'}</span>}
+                </label>
+              )}
 
               <FormInput
                 label="Purpose of Visit"

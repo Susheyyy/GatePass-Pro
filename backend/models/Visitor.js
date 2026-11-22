@@ -44,6 +44,10 @@ const visitorSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Resident'
   },
+  hostResidentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Resident' },
+  hostOccupancyId: String,
+  audienceOccupancyIds: { type: [String], default: [] },
+  revokedAt: Date,
   isBlacklisted: {
     type: Boolean,
     default: false
@@ -72,5 +76,9 @@ visitorSchema.pre('save', async function() {
 visitorSchema.methods.matchPasscode = async function(enteredPasscode) {
   return await bcrypt.compare(enteredPasscode, this.passcode);
 };
+
+visitorSchema.index({ createdAt: -1, _id: -1 });
+visitorSchema.index({ flatNo: 1, audienceOccupancyIds: 1, createdAt: -1, _id: -1 });
+visitorSchema.index({ flatNo: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Visitor', visitorSchema);

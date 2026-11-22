@@ -5,6 +5,8 @@ const http = require('node:http');
 const socketio = require('socket.io');
 const { authenticate } = require('./middleware/authMiddleware');
 const { validateConfig } = require('./config/security');
+const { actorRoom, sessionRoom } = require('./services/sessions');
+const { occupancyRoom } = require('./services/occupancy');
 
 function createApplication() {
   const app = express();
@@ -16,16 +18,25 @@ function createApplication() {
   app.use(helmet());
   app.use(cors({ origin: allowedOrigin }));
   app.use(express.json({ limit: '200kb' }));
+  app.use((req, res, next) => {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && (!req.body || typeof req.body !== 'object' || Array.isArray(req.body))) return res.status(400).json({ message: 'A JSON object body is required' });
+    next();
+  });
   app.use((req, res, next) => { req.io = io; next(); });
   io.use(async (socket, next) => {
     try { socket.user = await authenticate(socket.handshake.auth.token); next(); }
     catch { next(new Error('Invalid, expired or revoked session')); }
   });
   io.on('connection', socket => {
+    socket.join(sessionRoom(socket.user.sessionId));
+    socket.join(actorRoom(socket.user.role, socket.user.actorId));
+    const expiry = setTimeout(() => socket.disconnect(true), Math.max(0, new Date(socket.user.expiresAt).getTime() - Date.now()));
+    expiry.unref();
+    socket.on('disconnect', () => clearTimeout(expiry));
     socket.on('join_room', () => {
       if (socket.user.role === 'admin') socket.join('room_admins');
       else if (socket.user.role === 'security') socket.join('room_security');
-      else socket.join(`room_flat_${socket.user.flatNo}`);
+      else socket.join(occupancyRoom(socket.user.occupancyId));
     });
   });
   app.use('/api/residents', require('./routes/residentRoutes'));

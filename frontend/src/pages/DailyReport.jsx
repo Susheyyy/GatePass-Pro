@@ -1,3 +1,4 @@
+import { downloadCSV } from '../services/csv';
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Users, UserCheck, Clock, CheckCircle, Search, Download } from 'lucide-react';
@@ -10,6 +11,10 @@ export default function DailyReport() {
   if (role !== 'admin') {
     return <Navigate to="/" replace />;
   }
+  return <DailyReportContent />;
+}
+
+function DailyReportContent() {
   const toast = useToast();
   const [visitors, setVisitors] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,20 +65,12 @@ export default function DailyReport() {
       v.purpose || '',
       v.vehicleNumber || '',
       v.flatNo || '',
-      v.passcode || '',
+      '[MASKED]',
       v.status || '',
       v.checkedInAt ? new Date(v.checkedInAt).toLocaleString() : '',
       v.checkedOutAt ? new Date(v.checkedOutAt).toLocaleString() : ''
     ]);
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `daily_report_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCSV(`daily_report_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
     toast.success('Daily report exported successfully!');
   };
 

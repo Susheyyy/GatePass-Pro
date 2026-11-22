@@ -1,6 +1,6 @@
-// Review evidence only: these checks intentionally reproduce CURRENT defects.
-// They are not passing security regressions and are not part of `npm test`.
-// No application database, email provider, or remote service is contacted.
+
+
+
 const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
 const jwt = require('jsonwebtoken');

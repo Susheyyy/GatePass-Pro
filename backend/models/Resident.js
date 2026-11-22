@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { definitions } = require('../services/residentValidation');
 
 const residentSchema = new mongoose.Schema({
   flatNo: {
@@ -45,6 +46,9 @@ const residentSchema = new mongoose.Schema({
   otpPurpose: { type: String, enum: ['activate', 'reset'] },
   otpAttempts: { type: Number, default: 0 },
   tokenVersion: { type: Number, default: 0 },
+  occupancyId: { type: String, index: true },
+  occupancyStartedAt: Date,
+  deletedAt: { type: Date, default: null },
   otpExpiresAt: {
     type: Date
   },
@@ -91,7 +95,8 @@ const residentSchema = new mongoose.Schema({
     default: 'avatar1'
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  optimisticConcurrency: true
 });
 
 const bcrypt = require('bcryptjs');
@@ -103,5 +108,9 @@ residentSchema.pre('save', async function() {
 });
 
 residentSchema.index({ name: 'text', flatNo: 'text', vehicles: 'text' });
+residentSchema.index({ deletedAt: 1, createdAt: -1, _id: -1 });
+residentSchema.index({ gmail: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
+residentSchema.index({ email: 1 }, { unique: true });
+for (const [field, validate] of Object.entries(definitions)) residentSchema.path(field).validate(validate, `Invalid ${field}`);
 
 module.exports = mongoose.model('Resident', residentSchema);

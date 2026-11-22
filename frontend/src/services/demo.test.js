@@ -5,7 +5,7 @@ import { startDemoSession, endDemoSession, isDemoSession, apiStorage } from './d
 import { residentApi, visitorApi, postApi, notificationApi, getUserFromToken } from './api.js';
 import { connectSocket, getSocket } from './socket.js';
 
-// Match the enumerable keys and string values exposed by browser Storage.
+
 const storage = () => ({
   getItem(key) { return Object.hasOwn(this, key) ? this[key] : null; },
   setItem(key, value) { this[key] = String(value); },

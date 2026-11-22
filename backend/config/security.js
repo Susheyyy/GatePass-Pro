@@ -31,7 +31,7 @@ function issueOtp(email, purpose) {
   return { code, fields: { otp: otpHash(email, purpose, code), otpPurpose: purpose, otpAttempts: 0, otpExpiresAt: new Date(Date.now() + 15 * 60000) } };
 }
 
-const residentFields = '_id flatNo name mobile email gmail members status isFirstLogin distressMessages distressStatus communityId bio location address vehicles avatar createdAt updatedAt';
+const residentFields = '_id flatNo name mobile email gmail members status isFirstLogin distressMessages distressStatus communityId bio location address vehicles avatar occupancyId occupancyStartedAt createdAt updatedAt';
 function publicResident(document) {
   const source = document.toObject ? document.toObject() : document;
   return Object.fromEntries(residentFields.split(' ').filter(key => source[key] !== undefined).map(key => [key, source[key]]));

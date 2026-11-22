@@ -1,11 +1,13 @@
 import axios from 'axios';
 import { apiStorage, isDemoSession } from './demo.js';
+import { apiEndpoint } from './apiConfig.js';
+import { fetchCollection } from './pagination.js';
 
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000/api/residents';
+const API_BASE_URL = apiEndpoint('residents');
 
 axios.interceptors.request.use((config) => {
   if (isDemoSession()) {
-    // Reuse the local simulator without contacting any backend.
+
     config.adapter = async () => { throw new Error('Demo simulation'); };
     return config;
   }
@@ -21,6 +23,11 @@ axios.interceptors.request.use((config) => {
 
 function requireDemoFallback(error) {
   if (isDemoSession()) return;
+  if (error.response?.status === 401) {
+    sessionStorage.removeItem('gatepass_token');
+    sessionStorage.removeItem('gatepass_user');
+    window.dispatchEvent(new Event('gatepass_session_expired'));
+  }
   const message = error.response?.data?.message || 'Unable to reach GatePass Pro. No local changes were saved. Please retry when connected.';
   window.dispatchEvent(new CustomEvent('gatepass_api_error', { detail: message }));
   throw new Error(message, { cause: error });
@@ -34,7 +41,8 @@ export const getUserFromToken = () => {
     if (!['admin', 'security', 'resident'].includes(payload.role)) return null;
     if (isDemoSession()) return payload.demo === true ? payload : null;
     if (token.split('.').length !== 3 || payload.demo || !Number.isFinite(payload.exp) || payload.exp * 1000 <= Date.now()) return null;
-    return payload;
+    const cached = JSON.parse(sessionStorage.getItem('gatepass_user') || 'null');
+    return cached?.token === token ? { ...payload, ...cached.user } : payload;
   } catch (e) {
     return null;
   }
@@ -43,7 +51,7 @@ export const getUserFromToken = () => {
 export const getUserInfo = () => {
   const user = getUserFromToken();
   return {
-    role: user?.role || 'admin',
+    role: user?.role || '',
     email: user?.email || '',
     residentId: user?.residentId || '',
     flatNo: user?.flatNo || ''
@@ -80,6 +88,31 @@ const addLocalNotification = (notification) => {
 };
 
 export const residentApi = {
+  me: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/me`);
+      sessionStorage.setItem('gatepass_user', JSON.stringify({ token: sessionStorage.getItem('gatepass_token'), user: response.data }));
+      return response.data;
+    } catch (error) { requireDemoFallback(error); throw error; }
+  },
+  logout: async () => {
+    try { await axios.post(`${API_BASE_URL}/logout`, {}); }
+    catch (error) { requireDemoFallback(error); throw error; }
+  },
+  getHosts: async (flatNo) => {
+    try { return (await axios.get(`${API_BASE_URL}/hosts`, { params: { flatNo } })).data; }
+    catch (error) { requireDemoFallback(error); return getLocalResidents().filter(r => r.flatNo === flatNo && r.status === 'Approved'); }
+  },
+  getHouseholdStats: async () => {
+    try { return (await axios.get(`${API_BASE_URL}/household-stats`)).data; }
+    catch (error) {
+      requireDemoFallback(error);
+      const residents = getLocalResidents();
+      const units = new Map();
+      residents.filter(r => r.status === 'Approved').forEach(r => units.set(r.flatNo, Math.max(units.get(r.flatNo) || 0, Number(r.members) || 1)));
+      return { totalResidents: residents.length, occupiedUnits: units.size, totalMembers: [...units.values()].reduce((a, b) => a + b, 0) };
+    }
+  },
   requestActivation: async (email) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/request-activation`, { email });
@@ -226,10 +259,7 @@ export const residentApi = {
 
   getAll: async (searchQuery = '') => {
     try {
-      const response = await axios.get(`${API_BASE_URL}`, {
-        params: { search: searchQuery }
-      });
-      return response.data.residents ?? response.data;
+      return await fetchCollection(axios, API_BASE_URL, 'residents', { search: searchQuery });
     } catch (error) {
       requireDemoFallback(error);
       let list = getLocalResidents();
@@ -261,7 +291,8 @@ export const residentApi = {
 
   create: async (residentData) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}`, residentData);
+      const path = residentData.isResidentAdding ? '/household-members' : getUserInfo().role === 'admin' ? '/admin-create' : '';
+      const response = await axios.post(`${API_BASE_URL}${path}`, residentData);
       const created = response.data;
       return created;
     } catch (error) {
@@ -307,7 +338,7 @@ export const residentApi = {
         _id: 'mock-' + Math.random().toString(36).substr(2, 9),
         createdAt: new Date().toISOString()
       };
-      
+
       list.push(newResident);
       saveLocalResidents(list);
       const responseObj = { ...newResident };
@@ -555,7 +586,7 @@ export const residentApi = {
   }
 };
 
-const VISITOR_API_BASE_URL = import.meta.env?.VITE_API_URL ? import.meta.env?.VITE_API_URL.replace('/residents', '/visitors') : 'http://localhost:5000/api/visitors';
+const VISITOR_API_BASE_URL = apiEndpoint('visitors');
 
 const getLocalVisitors = () => {
   const local = apiStorage.getItem('gatepass_visitors');
@@ -570,8 +601,7 @@ const saveLocalVisitors = (visitors) => {
 export const visitorApi = {
   getAll: async (params = {}) => {
     try {
-      const response = await axios.get(VISITOR_API_BASE_URL, { params });
-      return response.data.visitors ?? response.data;
+      return await fetchCollection(axios, VISITOR_API_BASE_URL, 'visitors', params);
     } catch (error) {
       requireDemoFallback(error);
       console.warn('Backend offline, using LocalStorage fallback for visitors:', error.message);
@@ -657,7 +687,7 @@ export const visitorApi = {
         throw new Error(error.response.data.message || 'Server error');
       }
       console.warn('Backend offline, verifying passcode in LocalStorage:', error.message);
-      
+
       const flatKey = flatNo.trim().toUpperCase();
       const localLockouts = JSON.parse(apiStorage.getItem('gatepass_flat_lockouts') || '{}');
       const attempts = localLockouts[flatKey] || { count: 0, lockUntil: null };
@@ -842,7 +872,7 @@ export const visitorApi = {
   }
 };
 
-const POST_API_BASE_URL = import.meta.env?.VITE_API_URL ? import.meta.env?.VITE_API_URL.replace('/residents', '/posts') : 'http://localhost:5000/api/posts';
+const POST_API_BASE_URL = apiEndpoint('posts');
 
 const getLocalPosts = () => {
   const local = apiStorage.getItem('gatepass_posts');
@@ -857,8 +887,7 @@ const saveLocalPosts = (posts) => {
 export const postApi = {
   getAll: async () => {
     try {
-      const response = await axios.get(POST_API_BASE_URL);
-      return response.data;
+      return await fetchCollection(axios, POST_API_BASE_URL, 'posts');
     } catch (error) {
       requireDemoFallback(error);
       console.warn('Backend offline, using LocalStorage fallback for posts:', error.message);
@@ -964,7 +993,7 @@ export const postApi = {
   }
 };
 
-const NOTIF_API_BASE_URL = import.meta.env?.VITE_API_URL ? import.meta.env?.VITE_API_URL.replace('/residents', '/notifications') : 'http://localhost:5000/api/notifications';
+const NOTIF_API_BASE_URL = apiEndpoint('notifications');
 
 export const notificationApi = {
   getAll: async (role, flatNo) => {

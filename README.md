@@ -134,3 +134,19 @@ If you like this project, consider giving it a star!
 
 ### Security configuration and P0 upgrade
 Read [P0_UPGRADE.md](P0_UPGRADE.md) before deployment. Use backend/.env.example as the configuration template. JWT_SECRET and MONGO_URI are mandatory; privileged accounts have no default passwords. Existing installations must rotate credentials and use the dedicated account activation/recovery flow. Run npm test in each app, and run the backend integration suite with TEST_MONGO_URI pointing to a disposable MongoDB instance.
+
+### Session and occupancy upgrade
+
+Set `VITE_API_BASE_URL` in `frontend/.env` before a production build (see `frontend/.env.example`). Use the deployed API URL ending in `/api`, or `/api` when your host proxies that path to the backend. Development defaults to `http://localhost:5000/api`.
+
+The backend initializes session, household, and notification receipt indexes and backfills occupancy IDs at startup. This upgrade invalidates existing tokens; users must sign in again. Legacy visitor passes without an active host binding must be reissued. Changing a resident's flat or approval status, removing an account, and changing passwords revoke its sessions. Notifications and visitor history are scoped to the occupancy that received them. Read and dismissed states are stored per account.
+
+For a flat with multiple activated residents, choose the host when issuing a visitor pass. CSV exports mask passcodes and escape spreadsheet formulas.
+
+Run `npm test` in both applications. The MongoDB integration test requires `TEST_MONGO_URI` and creates a temporary database; it skips when the variable is absent.
+
+### Collection and community data boundaries
+
+Resident, visitor, and post list endpoints return `{ residents|visitors|posts, total, page, pages }`, with a maximum of 200 records per page and a stable creation-time/ID sort. Frontend collection reads traverse all pages and reject the whole read if a page fails. These reads are not point-in-time database snapshots; records can change while pages are loaded. Large exports should use the dedicated visitor export endpoint.
+
+Community post ownership is bound to the authenticated author and occupancy. Sharing a flat does not grant deletion rights, and legacy posts without an author identity can only be deleted by administrators. Post titles are limited to 120 characters and descriptions to 5000. Comments are appended atomically, with a limit of 200 comments per post and 2000 characters per comment; exceeding the comment limit returns HTTP 409.

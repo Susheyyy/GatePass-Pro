@@ -31,5 +31,6 @@ const registrationLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
+const authenticatedRegistrationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 100, keyGenerator: req => `${req.user.role}:${req.user.actorId}`, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many resident creation requests for this account' } });
 
-module.exports = { passcodeLimiter, loginLimiter, registrationLimiter, resetIpLimiter, resetAccountLimiter, challengeLimiter };
+module.exports = { passcodeLimiter, loginLimiter, registrationLimiter, authenticatedRegistrationLimiter, resetIpLimiter, resetAccountLimiter, challengeLimiter };

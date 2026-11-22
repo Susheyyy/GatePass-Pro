@@ -23,6 +23,7 @@ const notificationSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   }
+  ,audienceOccupancyIds: { type: [String], default: [], index: true }
 }, {
   timestamps: true
 });

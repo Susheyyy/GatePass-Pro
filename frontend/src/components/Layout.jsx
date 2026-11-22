@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, LogOut, Bell, User, MessageSquare, Trash2, Car, ChevronLeft, ChevronRight, Menu, Truck, FileText } from 'lucide-react';
-import { notificationApi, residentApi, visitorApi, getUserInfo } from '../services/api';
+import { LayoutDashboard, Users, ShieldAlert, Bell, User, MessageSquare, Trash2, Car, Menu, Truck, FileText } from 'lucide-react';
+import { notificationApi, residentApi, getUserInfo } from '../services/api';
 import { connectSocket, disconnectSocket } from '../services/socket';
 import { endDemoSession, isDemoSession } from '../services/demo';
 
@@ -67,10 +67,17 @@ export default function Layout({ children }) {
   );
 
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (!isDemoSession()) {
+      try { await residentApi.logout(); }
+      catch {
+        if (sessionStorage.getItem('gatepass_token')) return;
+      }
+    }
     disconnectSocket();
     endDemoSession();
     sessionStorage.removeItem('gatepass_token');
+    sessionStorage.removeItem('gatepass_user');
     navigate('/login');
   };
 

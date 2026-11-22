@@ -2,7 +2,7 @@ const PREFIX = 'gatepass_demo:';
 
 export const isDemoSession = () => sessionStorage.getItem('gatepass_demo') === 'true';
 
-// Demo data lives only in this tab and never overwrites normal offline records.
+
 export const apiStorage = {
   getItem: (key) => isDemoSession() ? sessionStorage.getItem(PREFIX + key) : localStorage.getItem(key),
   setItem: (key, value) => isDemoSession() ? sessionStorage.setItem(PREFIX + key, value) : localStorage.setItem(key, value)
@@ -38,7 +38,7 @@ export function startDemoSession(role) {
   apiStorage.setItem('gatepass_posts', JSON.stringify([{ _id: 'demo-post-1', title: 'Welcome to Maple Heights', description: 'Explore visitor approvals, gate entry and community announcements with fictional sample data.', category: 'General', authorName: 'System Administrator', flatNo: 'Admin', comments: [], createdAt: ago(30) }]));
   apiStorage.setItem('gatepass_notifications', JSON.stringify([{ _id: 'demo-notification-1', recipient: 'all', title: 'Welcome to the demo', message: 'Try checking in Demo Guest at A-101 with passcode 123456. All changes stay in this tab.', type: 'admin_broadcast', isRead: false, createdAt: ago(5) }]));
   const payload = { role, email: role === 'resident' ? residents[0].email : `${role}@example.com`, demo: true, ...(role === 'resident' ? { residentId: residents[0]._id, flatNo: residents[0].flatNo } : {}) };
-  // Deliberately not a signed JWT; never accepted by the backend.
+
   sessionStorage.setItem('gatepass_token', `demo.${btoa(JSON.stringify(payload))}`);
   return role === 'admin' ? '/' : role === 'security' ? '/visitors' : '/resident-dashboard';
 }
